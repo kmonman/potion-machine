@@ -707,6 +707,25 @@ deploy with a proper HTTPS cert (even a free static host), not local network exp
       about where the fixed right edge itself should sit. Verified at both 3 and
       5 digits again after the change.
 
+  30. **Hinge glow rebuilt to match two real reference screenshots** (touching
+      and not-touching, from the actual original game). Two real problems:
+      - It was **backwards** — `glowAlpha = 0.55 - hingeGlow*0.25` meant it got
+        *dimmer* while touched, an unverified guess from Stage 5 that never got
+        checked against real footage. The reference shows the opposite: the
+        outer ring and center both get *brighter* on touch.
+      - It was **too flat at idle** — just a soft blurred gradient, no structure.
+        The reference shows a crisp glowing ring plus small rotating "emitter"
+        points active *continuously*, not just fading in on touch.
+      Rebuilt `Platform.drawHinge()`: an ambient fill glow, a crisp stroked
+      outer ring with its own shadow-blur glow, 8 small white emitter dots
+      arranged in a slowly-rotating ring (`hingeEmitterPhase`, always spinning,
+      faster while touched) and a bright core glow layered over the existing
+      hinge sprite — all cool-purple at idle, warming to pink/magenta and
+      intensifying across every layer as `hingeGlow` (now correctly 0=idle,
+      1=touched=brighter) rises. Verified both states live via a frozen-physics
+      screenshot (couldn't rely on the normal game loop for a clean touching-state
+      shot — same real-time-vs-tool-call-latency issue noted earlier in this log).
+
 **Dev tooling note:** hit a caching issue while verifying the fixes above — the
 Browser-pane preview tool caches by *exact URL*, harder than a normal browser (even
 `location.reload(true)` didn't bust it; only navigating to a URL with a new query

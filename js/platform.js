@@ -27,10 +27,15 @@ const Platform = {
   timer: 0,
   direction: 1,
 
-  // Hinge glow + sparkle burst while the ball is touching it — matches the
-  // original's HingeDim/HingeBright color tween (dims + warms while touched, cools
-  // back to a brighter idle color when not) plus its SparklesFront particle burst.
-  hingeGlow: 0, // 0 = idle/bright, 1 = touched/dim
+  // Hinge glow + emitter ring + sparkle burst while the ball is touching it.
+  // Rob's real reference screenshots (a "not touching" and a "touching" shot of
+  // the actual original game) showed this port's version was both backwards
+  // (dimmer while touched — an earlier, unverified guess) and too flat even at
+  // idle: the real hinge has a visible glowing outer ring and small rotating
+  // "emitter" points active *at all times*, brightening further on touch,
+  // rather than just a soft blur that fades in.
+  hingeGlow: 0, // 0 = idle, 1 = touched — now brighter/warmer at 1, not dimmer
+  hingeEmitterPhase: 0, // drives the slow rotation of the emitter ring
   sparkles: [],
 
   reset() {
@@ -41,6 +46,7 @@ const Platform = {
     this.tweenElapsed = 0;
     this.timer = 0;
     this.hingeGlow = 0;
+    this.hingeEmitterPhase = 0;
     this.sparkles = [];
     this._initLiquid();
   },
@@ -69,6 +75,9 @@ const Platform = {
     const target = Physics.touchingHinge ? 1 : 0;
     const speed = target > this.hingeGlow ? 1 / 0.7 : 1 / 0.3;
     this.hingeGlow += (target - this.hingeGlow) * Math.min(1, dt * speed * 3);
+    // Emitters keep drifting even at idle (Rob: "not as dull as what we have"),
+    // spinning up further while touched.
+    this.hingeEmitterPhase += dt * (0.5 + this.hingeGlow * 1.4);
 
     if (Physics.touchingHinge) {
       for (let i = 0; i < 2; i++) {
@@ -121,27 +130,70 @@ const Platform = {
   // that ran before Physics.draw()).
   drawHinge(ctx, images) {
     const { x, y } = this.pivot;
+    const g = this.hingeGlow; // 0 idle .. 1 touched — brighter/warmer at 1
 
-    // Hinge glow ring — brighter/cooler when idle, dimmer/warmer while touched.
-    const glowColor = [
-      Math.round(121 + (187 - 121) * this.hingeGlow),
-      Math.round(62 + (165 - 62) * this.hingeGlow),
-      Math.round(249 + (249 - 249) * this.hingeGlow),
+    // Cool purple idle -> warm pink/magenta touched.
+    const c = [
+      Math.round(150 + (255 - 150) * g),
+      Math.round(80 + (55 - 80) * g),
+      Math.round(255 + (190 - 255) * g),
     ];
-    const glowAlpha = 0.55 - this.hingeGlow * 0.25;
-    const ring = ctx.createRadialGradient(x, y, 20, x, y, 60);
-    ring.addColorStop(0, `rgba(${glowColor.join(',')}, ${glowAlpha})`);
-    ring.addColorStop(1, `rgba(${glowColor.join(',')}, 0)`);
-    ctx.fillStyle = ring;
+    const rgb = c.join(',');
+
+    // Ambient fill glow behind everything — present at idle (not just a fade-in
+    // on touch), stronger while touched.
+    const fill = ctx.createRadialGradient(x, y, 0, x, y, 52);
+    fill.addColorStop(0, `rgba(${rgb}, ${0.28 + g * 0.32})`);
+    fill.addColorStop(1, `rgba(${rgb}, 0)`);
+    ctx.fillStyle = fill;
     ctx.beginPath();
-    ctx.arc(x, y, 60, 0, Math.PI * 2);
+    ctx.arc(x, y, 52, 0, Math.PI * 2);
     ctx.fill();
 
-    // Hinge (drawn on top, doesn't rotate).
+    // Crisp glowing outer ring — a real bright rim (not just a soft blur),
+    // thickening and lighting up further on touch.
+    ctx.save();
+    ctx.shadowColor = `rgba(${rgb}, 0.9)`;
+    ctx.shadowBlur = 12 + g * 16;
+    ctx.beginPath();
+    ctx.arc(x, y, 46, 0, Math.PI * 2);
+    ctx.strokeStyle = `rgba(${rgb}, ${0.5 + g * 0.4})`;
+    ctx.lineWidth = 3 + g * 2.5;
+    ctx.stroke();
+    ctx.restore();
+
+    // Small "emitter" points ringed around the hinge, slowly rotating even at
+    // idle so the whole thing reads as active/alive rather than a static glow —
+    // spin up and brighten further while touched.
+    const emitterCount = 8;
+    for (let i = 0; i < emitterCount; i++) {
+      const a = this.hingeEmitterPhase + (i / emitterCount) * Math.PI * 2;
+      const ex = x + Math.cos(a) * 34;
+      const ey = y + Math.sin(a) * 34;
+      ctx.save();
+      ctx.shadowColor = `rgba(${rgb}, 1)`;
+      ctx.shadowBlur = 5 + g * 9;
+      ctx.beginPath();
+      ctx.arc(ex, ey, 2.5 + g * 1.8, 0, Math.PI * 2);
+      ctx.fillStyle = `rgba(255, 255, 255, ${0.65 + g * 0.35})`;
+      ctx.fill();
+      ctx.restore();
+    }
+
+    // Hinge sprite (doesn't rotate) + a bright core glow on top that intensifies
+    // on touch, matching "the center ball of the hinge... increases" from Rob's
+    // description.
     if (images.hinge) {
       const s = 112;
       ctx.drawImage(images.hinge, x - s / 2, y - s / 2, s, s);
     }
+    const core = ctx.createRadialGradient(x, y, 0, x, y, 17);
+    core.addColorStop(0, `rgba(255, 255, 255, ${0.4 + g * 0.45})`);
+    core.addColorStop(1, `rgba(${rgb}, 0)`);
+    ctx.fillStyle = core;
+    ctx.beginPath();
+    ctx.arc(x, y, 17, 0, Math.PI * 2);
+    ctx.fill();
 
     this._drawSparkles(ctx);
 
