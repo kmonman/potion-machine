@@ -162,6 +162,19 @@ const Platform = {
     // the sprite's *own* ring/dot directly by tinting its actual pixels
     // (source-atop, on an offscreen copy so it can't bleed onto anything else
     // already drawn to the main canvas) instead of adding new shapes around it.
+    // Bridges the gap between the dot and the ring with the same glow, so
+    // touching reads as one connected light rather than two separate glowing
+    // shapes with a dark void between them (Rob: same glow treatment "to the
+    // center dot" too, not just the outer ring).
+    const bridge = ctx.createRadialGradient(x, y, 18, x, y, 46);
+    bridge.addColorStop(0, `rgba(${rgb}, 0)`);
+    bridge.addColorStop(0.55, `rgba(${rgb}, ${0.1 + g * 0.3})`);
+    bridge.addColorStop(1, `rgba(${rgb}, 0)`);
+    ctx.fillStyle = bridge;
+    ctx.beginPath();
+    ctx.arc(x, y, 46, 0, Math.PI * 2);
+    ctx.fill();
+
     if (images.hinge) {
       const s = 112;
       _hingeTintCtx.clearRect(0, 0, s, s);

@@ -839,6 +839,12 @@ deploy with a proper HTTPS cert (even a free static host), not local network exp
   42. **Inner core toned down** — alpha/shadow strength reduced (globalAlpha
       0.5-0.7 → 0.32-0.46, shadow blur 3-7 → 2-5) so the white core reads as a
       highlight rather than competing with the purple glow around it.
+  43. **Bridged the gap between the ring and the center dot** with a soft
+      radial gradient fill in that transparent space (radius 18-46, same
+      color, intensifying with `hingeGlow`) so contact reads as one connected
+      light rather than two separate glowing shapes with a dark void between
+      them — Rob wanted the same glow treatment extended to the dot, not just
+      the outer ring.
 
 **Dev tooling note:** hit a caching issue while verifying the fixes above — the
 Browser-pane preview tool caches by *exact URL*, harder than a normal browser (even
