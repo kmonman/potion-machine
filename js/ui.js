@@ -159,7 +159,10 @@ const LevelsScreen = {
 // x37-681 y186-412 of the drawn board.
 const GO_BOARD_BORDER = { left: 37, right: 681, top: 186, bottom: 412 };
 const GO_SCORE_FONT_SIZE = 68;
-const GO_SCORE_RIGHT = 670; // right-anchored, just inside the real border
+// Right-anchored to line up with the rightmost potion icon (x562, w72 -> right
+// edge 634) rather than the board's real border (681) — Rob: the score's right
+// edge was creeping too close to the border and past the bottles underneath it.
+const GO_SCORE_RIGHT = 634;
 const GO_SCORE_Y = 233;
 const GO_BUBBLE_GAP = 20; // gap between the bubble cluster and the score text
 const GO_BUBBLE_MASK_W = 90;

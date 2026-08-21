@@ -699,6 +699,13 @@ deploy with a proper HTTPS cert (even a free static host), not local network exp
       automatically as the number gets longer, verified with a 5-digit score
       ("12,345") alongside the normal 3-digit case. Also switched the score
       color to the exact grey Rob specified (`#9b9b9b`, was `#c7c7c9`).
+  29. **Follow-up: right edge still too close to the border.** `GO_SCORE_RIGHT`
+      moved 670→634 to line up with the rightmost potion icon's own right edge
+      (x562 + w72) instead of sitting closer to the board's real border (681,
+      past the bottles). The leftward-growth behavior from fix #28 already
+      covers "score grows left, bubbles move left with it" — this was just
+      about where the fixed right edge itself should sit. Verified at both 3 and
+      5 digits again after the change.
 
 **Dev tooling note:** hit a caching issue while verifying the fixes above — the
 Browser-pane preview tool caches by *exact URL*, harder than a normal browser (even
