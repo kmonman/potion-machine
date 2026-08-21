@@ -689,6 +689,16 @@ deploy with a proper HTTPS cert (even a free static host), not local network exp
       of a line" instead of emerging gradually. Added a matching bottom fade-in
       (~25px), so `edgeFade` is now the min of a top fade and a bottom fade
       rather than just the top one.
+  28. **Score layout was hardcoded for a 3-digit number.** Rob asked what
+      happens at 4-5 digits — nothing good; the fixed-width score box and static
+      bubble mask would've started overlapping. Replaced both with a shared
+      `_goScoreLayout()` that measures the actual score text width via
+      `ctx.measureText` each frame and right-anchors the score near the board's
+      real border (x=670), with the bubble mask's position derived from wherever
+      the score's left edge ends up — so the bubbles shift further left
+      automatically as the number gets longer, verified with a 5-digit score
+      ("12,345") alongside the normal 3-digit case. Also switched the score
+      color to the exact grey Rob specified (`#9b9b9b`, was `#c7c7c9`).
 
 **Dev tooling note:** hit a caching issue while verifying the fixes above — the
 Browser-pane preview tool caches by *exact URL*, harder than a normal browser (even

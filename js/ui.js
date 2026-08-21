@@ -153,14 +153,18 @@ const LevelsScreen = {
   },
 };
 
-// Mask region for the Game Over score's bubble-up effect (shared between the
-// update tick that spawns/moves the particles and the draw call that clips them).
-// Kept well inside GameOver11.png's actual visible border (measured directly from
-// the asset: the purple line sits at roughly x37-681 y186-412 of the drawn board,
-// not the board's own full x/y/w/h bounding box — that image has a lot of glow
-// padding around the real border). Previous values leaked past the top of the
-// line into the glow.
-const GO_BUBBLE_MASK = { x: 430, y: 200, w: 100, h: 95 };
+// GameOver11.png's actual visible border, measured directly from the asset
+// pixels (not the image's own x/y/w/h bounding box, which has a lot of glow
+// padding around the real line): the purple line sits at roughly
+// x37-681 y186-412 of the drawn board.
+const GO_BOARD_BORDER = { left: 37, right: 681, top: 186, bottom: 412 };
+const GO_SCORE_FONT_SIZE = 68;
+const GO_SCORE_RIGHT = 670; // right-anchored, just inside the real border
+const GO_SCORE_Y = 233;
+const GO_BUBBLE_GAP = 20; // gap between the bubble cluster and the score text
+const GO_BUBBLE_MASK_W = 90;
+const GO_BUBBLE_MASK_Y = 200;
+const GO_BUBBLE_MASK_H = 95;
 
 // ---------- Play screen (Level 1 / Free Play) ----------
 // Core ball-on-a-see-saw mechanic. Both modes still share the same difficulty
@@ -229,11 +233,34 @@ const PlayScreen = {
     }
   },
 
+  // Score width varies (585 vs. a 5-digit "12,345"), so the bubble cluster next
+  // to it needs to shift left to make room instead of overlapping — measured via
+  // the real canvas font rather than a fixed layout. Shared by the update tick
+  // (spawns bubbles using the mask bounds) and the draw call (clips to them),
+  // so both agree on where the mask currently is; safe to compute independently
+  // in each since the score is frozen for the whole time the screen is up.
+  _goScoreLayout() {
+    ctx.save();
+    ctx.font = `${GO_SCORE_FONT_SIZE}px PotionTitle`;
+    const scoreStr = this._scoreText();
+    const textWidth = ctx.measureText(scoreStr).width;
+    ctx.restore();
+
+    const scoreLeft = GO_SCORE_RIGHT - textWidth;
+    const maskRight = scoreLeft - GO_BUBBLE_GAP;
+    const maskX = Math.max(GO_BOARD_BORDER.left + 10, maskRight - GO_BUBBLE_MASK_W);
+    const maskW = Math.max(20, Math.min(GO_BUBBLE_MASK_W, maskRight - maskX));
+    return {
+      scoreStr, scoreLeft, textWidth,
+      mask: { x: maskX, y: GO_BUBBLE_MASK_Y, w: maskW, h: GO_BUBBLE_MASK_H },
+    };
+  },
+
   // Small continuous bubble-up effect next to the Game Over score, clipped to a
   // mask so bubbles appear to rise up out of the panel rather than float freely
   // (matches the original's own "BubbleMask" object over its equivalent effect).
   _updateGoBubbles(dt) {
-    const m = GO_BUBBLE_MASK;
+    const m = this._goScoreLayout().mask;
     this.goBubbleTimer -= dt;
     if (this.goBubbleTimer <= 0) {
       this.goBubbleTimer = 0.12;
@@ -414,27 +441,31 @@ const PlayScreen = {
       // source file, and sat noticeably too high/small.
       if (images.gameOverBallOff) drawImg(ctx, images.gameOverBallOff, 92, 261, 172, 106);
 
+      const goLayout = this._goScoreLayout();
+
       // Bubble-up effect immediately left of the score, clipped to a mask so
       // the bubbles read as rising up out of the panel rather than floating
       // freely (Rob: "masked by the panel and bubbling up") — matches the
       // original's own "BubbleMask" object over its equivalent effect. Uses the
       // real bubble art (BubblesFinal.png, cropped to one isolated glossy bubble
       // near its top-right) instead of flat hand-drawn circles, for a more
-      // realistic look (Rob's follow-up ask).
+      // realistic look. The mask itself shifts left as the score gets wider
+      // (via _goScoreLayout) so a 4-5 digit score doesn't run into it.
       const BUBBLE_SPRITE = { sx: 300, sy: 0, sw: 228, sh: 210 };
+      const mask = goLayout.mask;
       ctx.save();
       ctx.beginPath();
-      ctx.rect(GO_BUBBLE_MASK.x, GO_BUBBLE_MASK.y, GO_BUBBLE_MASK.w, GO_BUBBLE_MASK.h);
+      ctx.rect(mask.x, mask.y, mask.w, mask.h);
       ctx.clip();
       if (images.bubblesFinal) {
-        const maskBottom = GO_BUBBLE_MASK.y + GO_BUBBLE_MASK.h;
+        const maskBottom = mask.y + mask.h;
         for (const b of this.goBubbles) {
           const x = b.x + Math.sin(b.wobblePhase) * b.wobbleAmp;
           // Fades at both the top (fully faded out before reaching the border
           // line) and the bottom (fades IN over ~25px instead of snapping to
           // full opacity right at the mask edge, which read as bubbles
           // "coming out of a line" rather than emerging gradually).
-          const topFade = Math.min(1, Math.max(0, (b.y - GO_BUBBLE_MASK.y) / 20));
+          const topFade = Math.min(1, Math.max(0, (b.y - mask.y) / 20));
           const bottomFade = Math.min(1, Math.max(0, (maskBottom - b.y) / 25));
           const edgeFade = Math.min(topFade, bottomFade);
           if (edgeFade <= 0.01) continue;
@@ -446,20 +477,21 @@ const PlayScreen = {
       }
       ctx.restore();
 
-      // Final score — the source's own "FinalScoreText" object, anchored at
-      // x=586 y=253, i.e. inside the board on the same row as the icon above,
-      // not the small top-left HUD pill (which is hidden entirely once the run
-      // is over — see _drawHud). Bigger and grey (matching "GAME OVER" itself)
-      // per Rob's follow-up — it started out sized/colored like the small HUD
-      // pill's number instead of matching the big Game Over art. x/w pulled in
-      // from the original's raw anchor — at the original width it ran past the
-      // board's real right border (measured at x≈681, not the board's full 759
-      // width, which has its own glow padding baked in).
+      // Final score — the source's own "FinalScoreText" object, right-anchored
+      // near the board's real right border (x=670 of the measured x37-681 line)
+      // instead of a fixed-width centered box, so it grows leftward for longer
+      // numbers (pushing the bubble mask over with it) rather than overflowing
+      // the border or overlapping the bubbles. Grey #9b9b9b per Rob's spec —
+      // matching "GAME OVER" itself, not the small HUD pill's white/purple tone.
       ctx.save();
+      ctx.font = `${GO_SCORE_FONT_SIZE}px PotionTitle`;
+      ctx.fillStyle = '#9b9b9b';
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'top';
       ctx.shadowColor = 'rgba(0, 0, 0, 0.45)';
       ctx.shadowBlur = 4;
       ctx.shadowOffsetY = 3;
-      drawCenteredText(ctx, this._scoreText(), 520, 233, 150, { size: 68, font: 'PotionTitle', color: '#c7c7c9' });
+      ctx.fillText(goLayout.scoreStr, goLayout.scoreLeft, GO_SCORE_Y);
       ctx.restore();
 
       // 3 potion-fill icons inside the board, at the original's own relative
