@@ -610,6 +610,31 @@ deploy with a proper HTTPS cert (even a free static host), not local network exp
       which is what I'd built instead before this correction. Re-added
       `_potionsFilled()` and the board/potion asset references that fix #18 had
       dropped.
+  22. **Game Over background was flat black, and the "fell off" icon was still
+      missing.** Two follow-ups to fix #21's screenshot:
+      - The original's `DarkOverlay` object turned out to just be `Background
+        1.png` (the same Home-screen sky gradient — dark at the bottom, lighter
+        at the top) redrawn at ~90% opacity, not a flat color. Swapped this
+        port's flat `rgba(0,0,0,0.85)` fill for that same image (at the same
+        oversized/offset framing the Home screen already uses) plus a lighter
+        ~35% black wash on top for text contrast.
+      - The faint "T + red dot" silhouette I'd written off as incidental
+        platform bleed-through in fix #21 is actually a real, deliberately
+        named asset — `Ball Off.png`, a small gray T-shaped platform icon with a
+        pink dot beside it, literally illustrating "the ball fell off." Restored
+        it at the original's real position (boardX+55, boardY+48).
+      - Added a slight glow + flicker to the "GAME OVER" art itself (two
+        overlapping sine waves driving shadowBlur/shadowColor, offset downward
+        so the glow concentrates toward the bottom of the letters) — a Rob polish
+        request, not something pulled from the original.
+  23. **Small round of gameplay polish requests**, all straightforward: hinge
+      bubbles recolored more saturated pink/magenta for contrast against the dark
+      background (were leaning pale/washed-out lavender); the liquid's surface
+      shine brightened further toward white with a higher opacity ceiling; and
+      the ball's draw order moved to sit *behind* the hinge glow/sprite and the
+      hinge bubbles instead of on top of both (`Platform.draw()` split into a
+      base pass and a new `Platform.drawHinge()` so `Physics.draw()` — the ball —
+      can run in between them).
 
 **Dev tooling note:** hit a caching issue while verifying the fixes above — the
 Browser-pane preview tool caches by *exact URL*, harder than a normal browser (even

@@ -243,8 +243,12 @@ const PlayScreen = {
 
     Fog.draw(ctx, images);
     Platform.draw(ctx, images);
-    HingeBubbles.draw(ctx);
+    // Ball drawn behind the hinge glow/sprite and the hinge bubbles (Rob's ask) —
+    // previously drawn last, so it rendered on top of both instead of appearing
+    // to actually sit under/against the hinge.
     Physics.draw(ctx, images);
+    Platform.drawHinge(ctx, images);
+    HingeBubbles.draw(ctx);
     Difficulty.drawMoon(ctx, images);
 
     this._drawHud(ctx, images, sceneLabel);
@@ -327,25 +331,41 @@ const PlayScreen = {
   // a duplicate purple score readout, and a potion-fill row — none of which
   // actually appear in the real game (confirmed against Rob's screenshot of it).
   _drawGameOver(ctx, images) {
-    ctx.fillStyle = `rgba(0,0,0,${0.85 * Math.min(1, this.gameOverT * 2)})`;
+    const fadeIn = Math.min(1, this.gameOverT * 2);
+
+    // Backdrop: the same gradient used behind the Home screen (dark at the
+    // bottom, lighter toward the top) — the original's own "DarkOverlay" object
+    // reuses this exact image at ~90% opacity rather than a flat black fill,
+    // which is what this port was doing before (that read as a plain black
+    // screen instead of the moody gradient in Rob's reference).
+    if (images.sky) {
+      ctx.save();
+      ctx.globalAlpha = 0.92 * fadeIn;
+      drawImg(ctx, images.sky, -19, -17, 752, 1309);
+      ctx.restore();
+    }
+    ctx.fillStyle = `rgba(0,0,0,${0.35 * fadeIn})`;
     ctx.fillRect(0, 0, 720, 1280);
 
     const t = easeOutBack(this.gameOverT);
 
     // The board: a glow-outline frame (GameOver11.png) with a genuinely
-    // transparent interior — no solid backing. That transparency is exactly why
-    // Rob's reference screenshot shows a faint "T"-shaped silhouette with a small
-    // colored dot inside it near the top-left: that's not a drawn icon, it's the
-    // actual platform pole + hinge (already drawn earlier in this same frame)
-    // showing through the dark overlay. Positioned at the original's own
-    // coordinates (x≈-20 y127 w759 h343 in the 720x1280 scene) — it sits directly
-    // below the small top-left HUD pill (which ends at y124), close enough that
-    // the two read as one continuous panel, matching the reference exactly.
+    // transparent interior — no solid backing behind it. Positioned at the
+    // original's own coordinates (x≈-20 y127 w759 h343 in the 720x1280 scene) —
+    // it sits directly below the small top-left HUD pill (which ends at y124),
+    // close enough that the two read as one continuous panel, matching Rob's
+    // reference screenshot.
     const boardX = (720 - 759) / 2, boardY = 127, boardW = 759, boardH = 343;
     if (images.gameOverBoard) {
       ctx.save();
-      ctx.globalAlpha = Math.min(1, this.gameOverT * 2);
+      ctx.globalAlpha = fadeIn;
       drawImg(ctx, images.gameOverBoard, boardX, boardY, boardW, boardH);
+
+      // "Ball fell off the platform" icon — a real asset (Ball Off.png: a small
+      // gray T-shaped platform silhouette with a pink dot beside it) that fix #18
+      // wrongly dropped, mistaking it for background bleed-through. Real position
+      // was boardX+55, boardY+48 in the original.
+      if (images.gameOverBallOff) drawImg(ctx, images.gameOverBallOff, boardX + 55, boardY + 48, 100, 62);
 
       // 3 potion-fill icons inside the board, at the original's own relative
       // position (x428/497/562 y311 out of the 720-wide scene).
@@ -360,10 +380,18 @@ const PlayScreen = {
 
     if (images.gameOverText) {
       const w = 560, h = w * (images.gameOverText.height / images.gameOverText.width);
+      // Slight glow + flicker concentrated toward the bottom of the letters —
+      // two overlapping sine waves so it doesn't read as a perfectly regular
+      // pulse, more like an unstable neon sign.
+      const now = Date.now();
+      const flicker = 0.7 + 0.3 * (0.6 * Math.sin(now / 180) + 0.4 * Math.sin(now / 47));
       ctx.save();
-      ctx.globalAlpha = Math.min(1, this.gameOverT * 2);
+      ctx.globalAlpha = fadeIn;
       ctx.translate(360, 560 + h / 2);
       ctx.scale(t, t);
+      ctx.shadowColor = `rgba(190, 120, 255, ${Math.max(0, 0.7 * flicker)})`;
+      ctx.shadowBlur = 22 * flicker;
+      ctx.shadowOffsetY = 14;
       drawImg(ctx, images.gameOverText, -w / 2, -h / 2, w, h);
       ctx.restore();
     }

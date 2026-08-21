@@ -105,10 +105,12 @@ const HingeBubbles = {
       ctx.beginPath();
       ctx.arc(x, b.y, b.r, 0, Math.PI * 2);
       // Filled pink core + brighter rim — reads as a much thicker bubble cluster
-      // than the old thin purple outline, matching the intro art's look.
-      ctx.fillStyle = `rgba(230, 90, 220, ${Math.max(0, alpha * 0.35)})`;
+      // than the old thin purple outline, matching the intro art's look. Pushed
+      // more saturated/less washed-out (Rob: "more chroma") for contrast against
+      // the dark background — the old tones leaned pale/lavender.
+      ctx.fillStyle = `rgba(255, 20, 160, ${Math.max(0, alpha * 0.4)})`;
       ctx.fill();
-      ctx.strokeStyle = `rgba(255, 170, 245, ${Math.max(0, alpha)})`;
+      ctx.strokeStyle = `rgba(255, 45, 190, ${Math.max(0, alpha)})`;
       ctx.lineWidth = 1.5;
       ctx.stroke();
     }

@@ -113,6 +113,14 @@ const Platform = {
     this._drawLiquid(ctx);
     this._drawGlass(ctx, images);
     ctx.restore();
+  },
+
+  // Hinge glow + sprite + sparkles + jets — split out from draw() so the ball can
+  // be drawn in between (Rob: the ball should render behind the hinge and its
+  // bubbles, not on top of them like it did when everything here was one call
+  // that ran before Physics.draw()).
+  drawHinge(ctx, images) {
+    const { x, y } = this.pivot;
 
     // Hinge glow ring — brighter/cooler when idle, dimmer/warmer while touched.
     const glowColor = [
@@ -286,12 +294,14 @@ const Platform = {
       const a = cols[i], b = cols[i + 1];
       const depthA = halfT - a.level, depthB = halfT - b.level;
       const depth = Math.min(depthA, depthB);
-      const alpha = smoothstep(0, maxDepth * 0.22, depth) * 0.75;
+      // Lightened toward white with a higher ceiling (was 220,250 @ 0.75) —
+      // Rob wanted the surface reflection brighter.
+      const alpha = smoothstep(0, maxDepth * 0.22, depth) * 0.9;
       if (alpha <= 0.01) continue;
       ctx.beginPath();
       ctx.moveTo(a.x, a.level);
       ctx.lineTo(b.x, b.level);
-      ctx.strokeStyle = `rgba(255, 220, 250, ${alpha.toFixed(3)})`;
+      ctx.strokeStyle = `rgba(255, 245, 255, ${alpha.toFixed(3)})`;
       ctx.lineWidth = 3;
       ctx.stroke();
     }
