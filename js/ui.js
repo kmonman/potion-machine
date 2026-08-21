@@ -166,6 +166,7 @@ const PlayScreen = {
   mode: 'freeplay',
   timedOut: false,
   gameOverT: 0, // 0-1 pop-in progress once the run has ended
+  leaderboardMsgT: 0, // >0 while the "coming soon" message is showing
 
   // Free Play only: a charge every 1000 points, tap a blast button to spend one.
   blastCharges: 0,
@@ -184,6 +185,7 @@ const PlayScreen = {
     this.elapsed = 0;
     this.timedOut = false;
     this.gameOverT = 0;
+    this.leaderboardMsgT = 0;
     this.blastCharges = 0;
     this.blastThreshold = 0;
   },
@@ -209,7 +211,12 @@ const PlayScreen = {
     } else {
       HingeBubbles.update(dt, false, Platform.pivot.x, Platform.pivot.y);
       this.gameOverT = Math.min(1, this.gameOverT + dt / 0.35);
+      if (this.leaderboardMsgT > 0) this.leaderboardMsgT = Math.max(0, this.leaderboardMsgT - dt);
     }
+  },
+
+  showLeaderboardComingSoon() {
+    this.leaderboardMsgT = 1.6;
   },
 
   fireBlast() {
@@ -246,14 +253,35 @@ const PlayScreen = {
   },
 
   _drawHud(ctx, images, sceneLabel) {
-    // Score, in its bubble container.
-    if (images.bubbleScore) {
-      ctx.drawImage(images.bubbleScore, 20, 20, 238, 104);
-    }
-    drawCenteredText(ctx, this._scoreText(), 60, 55, 170, { size: 34, font: 'PotionTitle', color: '#fff' });
+    // Player name + separator dot, immediately left of the score bubble — matches
+    // the original's "Name · [score]" top-left summary, which this port previously
+    // dropped entirely (only the score bubble was ever drawn). Measured dynamically
+    // since names vary in width (up to the 16-char input limit).
+    ctx.save();
+    ctx.font = '28px PotionBody';
+    ctx.fillStyle = '#fff';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
+    const nameStr = state.playerName + ' ·';
+    ctx.fillText(nameStr, 20, 72);
+    const nameWidth = ctx.measureText(nameStr).width;
+    ctx.restore();
 
-    drawCenteredText(ctx, sceneLabel, 0, 40, 720, { size: 26, font: 'PotionTitle', color: 'rgba(255,255,255,0.6)' });
-    drawCenteredText(ctx, this._timeText(), 0, 78, 720, { size: 30, font: 'PotionBody', color: COLOR.instructions });
+    // Score, in its bubble container.
+    const pillX = 20 + nameWidth + 14;
+    if (images.bubbleScore) {
+      ctx.drawImage(images.bubbleScore, pillX, 20, 238, 104);
+    }
+    drawCenteredText(ctx, this._scoreText(), pillX + 40, 55, 170, { size: 34, font: 'PotionTitle', color: '#fff' });
+
+    // Hidden once the run is over — matches the reference Game Over screenshot
+    // (no mode/timer text up top there). Shifted into the upper-right (was
+    // dead-center) so it no longer collides with the name+score pill, which
+    // grows wider than the old score-only pill for longer player names.
+    if (!this.isOver) {
+      drawCenteredText(ctx, sceneLabel, 400, 40, 320, { size: 22, font: 'PotionTitle', color: 'rgba(255,255,255,0.6)' });
+      drawCenteredText(ctx, this._timeText(), 400, 74, 320, { size: 26, font: 'PotionBody', color: COLOR.instructions });
+    }
 
     // In-game mute toggle — same shared mute state as Home.
     const muteImg = state.muted ? images.muteMuted : images.muteUnmuted;
@@ -329,19 +357,36 @@ const PlayScreen = {
       px += potionW + gap;
     }
 
-    // Buttons — the original's own art for these was an unfinished blank
-    // placeholder, so these are drawn in this port's own button style instead.
-    this.retryBtn = { x: 220, y: boardY + 280, w: 130, h: 56 };
-    this.gameOverHomeBtn = { x: 370, y: boardY + 280, w: 130, h: 56 };
-    drawButton(ctx, this.retryBtn, 'Try Again');
-    drawButton(ctx, this.gameOverHomeBtn, 'Home');
+    // Row of 3 round buttons (home / restart / 3rd shortcut) — one combined pill
+    // image with 3 equal tap-zones, matching the original (previously this port
+    // substituted its own plain text buttons because I'd assumed the original had
+    // no real art here — it did, just uncopied). Free Play's 3rd icon opens the
+    // leaderboard; Level 1's opens the levels grid.
+    const barW = 460, barH = 96;
+    const barX = (720 - barW) / 2, barY = boardY + 260;
+    const bottomImg = this.mode === 'level1' ? images.bottomButtonsLevels : images.bottomButtonsFreeplay;
+    if (bottomImg) drawImg(ctx, bottomImg, barX, barY, barW, barH);
+    this.bottomButtonsRect = { x: barX, y: barY, w: barW, h: barH };
+
+    if (this.leaderboardMsgT > 0) {
+      ctx.save();
+      ctx.globalAlpha = Math.min(1, this.leaderboardMsgT);
+      drawCenteredText(ctx, 'Leaderboard coming soon!', 0, barY - 40, 720,
+        { size: 24, font: 'PotionBody', color: '#fff' });
+      ctx.restore();
+    }
   },
 
   hitTest(x, y) {
     if (this.isOver) {
       if (this.gameOverT < 1) return null;
-      if (this.retryBtn && rectContains(this.retryBtn.x, this.retryBtn.y, this.retryBtn.w, this.retryBtn.h, x, y)) return { target: 'retry' };
-      if (this.gameOverHomeBtn && rectContains(this.gameOverHomeBtn.x, this.gameOverHomeBtn.y, this.gameOverHomeBtn.w, this.gameOverHomeBtn.h, x, y)) return { target: 'home' };
+      const b = this.bottomButtonsRect;
+      if (b && rectContains(b.x, b.y, b.w, b.h, x, y)) {
+        const third = Math.floor((x - b.x) / (b.w / 3));
+        if (third === 0) return { target: 'home' };
+        if (third === 1) return { target: 'retry' };
+        return { target: this.mode === 'level1' ? 'levels' : 'leaderboard' };
+      }
       return null;
     }
     if (rectContains(this.muteBtn.x, this.muteBtn.y, this.muteBtn.w, this.muteBtn.h, x, y)) return { target: 'mute' };
@@ -354,15 +399,6 @@ const PlayScreen = {
     return null;
   },
 };
-
-function drawButton(ctx, b, label) {
-  ctx.fillStyle = 'rgba(144, 19, 254, 0.18)';
-  ctx.fillRect(b.x, b.y, b.w, b.h);
-  ctx.strokeStyle = COLOR.purple;
-  ctx.lineWidth = 2;
-  ctx.strokeRect(b.x, b.y, b.w, b.h);
-  drawCenteredText(ctx, label, b.x, b.y + b.h / 2 - 12, b.w, { size: 22, font: 'PotionBody', color: '#fff' });
-}
 
 function easeOutBack(t) {
   const c1 = 1.70158, c3 = c1 + 1;

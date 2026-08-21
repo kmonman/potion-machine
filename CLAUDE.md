@@ -532,6 +532,37 @@ deploy with a proper HTTPS cert (even a free static host), not local network exp
       once, confirmed via the console that playback was actually running
       (`Music.started === true`, `Music.el.paused === false`) and pointed at the
       real copied file, not a 404.
+  17. **Game Over screen's buttons and top HUD didn't match the original at all.**
+      Rob sent a screenshot of the real original game (gd.games-hosted preview),
+      and it turned out I'd wrongly assumed the original's Game Over button art
+      was an unfinished placeholder back in Stage 4 — it wasn't, I just hadn't
+      looked hard enough in the source `assets/` folder. Found the real assets and
+      ported them:
+      - **Bottom button row**: the original uses one combined pill image (icons +
+        divider lines baked in, 3 equal tap-zones) rather than 3 separate button
+        sprites — `Bottom Buttons.png` for Free Play (3rd icon = leaderboard
+        shortcut) and `Bottom Buttons Levels.png` for Level 1 (3rd icon = levels
+        grid shortcut). Replaced this port's own plain text "Try Again"/"Home"
+        buttons with these, split into 3 equal hit-zones by x-position. Home and
+        Restart are wired to the same real actions as before; Level 1's 3rd icon
+        really does open the levels grid (that screen already existed); Free
+        Play's 3rd icon shows a brief "Leaderboard coming soon!" message since the
+        real leaderboard is still Stage 6, not yet built — didn't want a
+        leaderboard-shaped icon that silently does nothing when tapped.
+      - **Top HUD was missing the player's name entirely** — only the score
+        bubble was ever drawn, but the original shows "Name · [score]" as one
+        unit. Added the name (with a `·` separator) immediately left of the score
+        bubble, width measured dynamically per name so it fits any length up to
+        the 16-char input limit.
+      - Widening that name+score pill for real names immediately collided with
+        the mode label ("Free Play"/timer) that used to sit dead-center at the
+        top — moved that label into the upper-right instead (near the mute
+        button) and hid it entirely once the run is over, matching the
+        reference screenshot (no mode label shown there) and giving the pill
+        room regardless of name length.
+      Verified live for both Free Play and Level 1 game-over states, plus active
+      Free Play gameplay with a 6-letter test name, confirming no more overlap
+      between the pill and the mode label.
 
 **Dev tooling note:** hit a caching issue while verifying the fixes above — the
 Browser-pane preview tool caches by *exact URL*, harder than a normal browser (even

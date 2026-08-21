@@ -38,6 +38,12 @@ const ASSET_PATHS = {
   fogFront: 'assets/FogFront3.png',
   fogFrontFlip: 'assets/FogFront3Flip.png',
   potionBlast: 'assets/Blast2.png',
+  // Game Over's row of 3 round buttons — one combined pill image (icons + dividers
+  // baked in, tap zones split into thirds) rather than 3 separate button sprites.
+  // Two variants matching the original: Free Play's 3rd icon is a leaderboard
+  // shortcut, Level 1's is a levels-grid shortcut.
+  bottomButtonsFreeplay: 'assets/Bottom Buttons.png',
+  bottomButtonsLevels: 'assets/Bottom Buttons Levels.png',
 };
 
 const canvas = document.getElementById('gameCanvas');
@@ -196,6 +202,8 @@ function handleTap(clientX, clientY) {
     else if (hit && hit.target === 'retry') PlayScreen.enter(state.screen);
     else if (hit && hit.target === 'mute') toggleMute();
     else if (hit && hit.target === 'blast') PlayScreen.fireBlast();
+    else if (hit && hit.target === 'levels') state.screen = 'levels';
+    else if (hit && hit.target === 'leaderboard') PlayScreen.showLeaderboardComingSoon();
     return;
   }
 }
