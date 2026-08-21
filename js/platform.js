@@ -145,13 +145,12 @@ const Platform = {
     const { x, y } = this.pivot;
     const g = this.hingeGlow; // 0 idle .. 1 touched — brighter/warmer at 1
 
-    // Muted purple/magenta blend — brightens/warms slightly on touch rather
-    // than shifting hue. Toned down from an earlier pass that pushed this
-    // toward a much more saturated hot pink than the reference actually shows.
+    // Purple, brightening on touch (was drifting toward pink/magenta — Rob
+    // wants it purple, not pink).
     const c = [
-      Math.round(175 + (225 - 175) * g),
-      Math.round(75 + (55 - 75) * g),
-      Math.round(220 + (195 - 220) * g),
+      Math.round(140 + (175 - 140) * g),
+      Math.round(70 + (85 - 70) * g),
+      Math.round(230 + (255 - 230) * g),
     ];
     const rgb = c.join(',');
 
@@ -171,7 +170,15 @@ const Platform = {
       _hingeTintCtx.fillStyle = `rgba(${rgb}, ${0.35 + g * 0.55})`;
       _hingeTintCtx.fillRect(0, 0, s, s);
       _hingeTintCtx.globalCompositeOperation = 'source-over';
+      // Actual glow this time — shadowBlur applies to the tinted sprite's own
+      // opaque shape (the ring + dot), so it glows around its real edges
+      // rather than needing a second drawn shape. The tint-only version above
+      // had no glow at all, which is what Rob just flagged.
+      ctx.save();
+      ctx.shadowColor = `rgba(${rgb}, 0.95)`;
+      ctx.shadowBlur = 10 + g * 14;
       ctx.drawImage(_hingeTintCanvas, x - s / 2, y - s / 2, s, s);
+      ctx.restore();
     }
 
     this._drawSparkles(ctx);

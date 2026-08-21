@@ -823,6 +823,13 @@ deploy with a proper HTTPS cert (even a free static host), not local network exp
       touch distance finally lines up with where the ball visually reaches the
       real ring, not a made-up number. Verified both idle and touched states
       live — single tinted ring+dot, no second shape anywhere near it.
+  40. **Follow-up: purple not pink, and needs an actual glow.** The tint-only
+      version had no glow at all (`fillRect` with `source-atop` just recolors
+      pixels flat) — added `ctx.shadowBlur`/`shadowColor` around the final
+      `drawImage` of the tinted sprite, which glows around its real opaque
+      shape (the ring + dot) the same way shadowBlur would around a stroked
+      path. Color shifted from a pink/magenta blend to purple (140,70,230) →
+      (175,85,255), brightening on touch rather than changing hue.
 
 **Dev tooling note:** hit a caching issue while verifying the fixes above — the
 Browser-pane preview tool caches by *exact URL*, harder than a normal browser (even
