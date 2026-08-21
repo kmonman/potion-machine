@@ -7,6 +7,15 @@ function easeInOutSine(t) {
   return -(Math.cos(Math.PI * t) - 1) / 2;
 }
 
+// Offscreen scratch canvas for tinting the hinge sprite's own pixels (see
+// Platform.drawHinge) — reused every frame rather than allocated fresh, and
+// kept isolated from the main canvas so the tint fill can't bleed onto
+// anything else already drawn there.
+const _hingeTintCanvas = document.createElement('canvas');
+_hingeTintCanvas.width = 112;
+_hingeTintCanvas.height = 112;
+const _hingeTintCtx = _hingeTintCanvas.getContext('2d');
+
 const Platform = {
   pivot: { x: 360, y: 652 },
   // Shortened from the original's 674 (Rob's phone test: the tube reached close
@@ -17,7 +26,13 @@ const Platform = {
   // 100px fall-through margin (Physics._checkBoundaries) still gives room to drop.
   length: 620,
   thickness: 52,
-  hingeRingRadius: 32, // matches the radius drawHinge() actually strokes at — Physics._checkHinge reads this so "touching" lines up with the visible ring, not a disconnected magic number
+  // The sprite's own outer ring (Hinge.png), measured directly from the asset
+  // pixels: it sits at radius 42-49 of the 100x100 source, scaled to the 112px
+  // display size drawHinge() actually draws at (×1.12) → ~47-55. Used as the
+  // outer edge so Physics._checkHinge's "touching" threshold lines up with
+  // where the ball visually reaches this real ring — not a separate glow shape
+  // drawn at some other, disconnected radius.
+  hingeRingRadius: 55,
   poleHeight: 630,
 
   angle: 0, // degrees; positive = right end tilts down
@@ -140,37 +155,23 @@ const Platform = {
     ];
     const rgb = c.join(',');
 
-    // Just the ring's own edge glows (Rob) — no broad ambient fill flooding the
-    // area around it (an earlier pass had a large soft radial gradient here on
-    // top of the ring's own glow, which read as a big bright halo rather than a
-    // contained rim light).
-    ctx.save();
-    ctx.shadowColor = `rgba(${rgb}, 0.85)`;
-    ctx.shadowBlur = 6 + g * 8;
-    ctx.beginPath();
-    ctx.arc(x, y, this.hingeRingRadius, 0, Math.PI * 2);
-    ctx.strokeStyle = `rgba(${rgb}, ${0.4 + g * 0.35})`;
-    ctx.lineWidth = 2 + g * 1.5;
-    ctx.stroke();
-    ctx.restore();
-
-    // Dust particles between the core and ring went through several tuning
-    // passes (rotating dots, then a fixed tick pattern, then twinkling dust)
-    // and every version kept reading back as a "white area" once several of
-    // them sat this close together in this small a space, no matter how much
-    // the blur/alpha/color got dialed down. Removed outright — just the ring
-    // and the sprite's own center dot for now, both already changing with
-    // touch. Can revisit texture here later if it's still wanted once this
-    // simpler baseline is confirmed clean.
-
-    // Hinge sprite (doesn't rotate). A white radial-gradient "core glow" used to
-    // sit on top of this to make the center brighten on touch, but it read as a
-    // stray whitish circle rather than a natural highlight — removed. The
-    // sprite's own center dot plus the ambient fill glow behind everything
-    // already carries the brightening.
+    // Every earlier pass here drew a *separate* glow ring next to the sprite's
+    // own outer ring, which is what Rob was actually seeing as "a pink I
+    // added" that needed removing — the sprite's real ring sits at a much
+    // bigger radius (~50px) than the 32px I'd been drawing at, so mine never
+    // lined up with it, it just looked like an extra shape. Real fix: light up
+    // the sprite's *own* ring/dot directly by tinting its actual pixels
+    // (source-atop, on an offscreen copy so it can't bleed onto anything else
+    // already drawn to the main canvas) instead of adding new shapes around it.
     if (images.hinge) {
       const s = 112;
-      ctx.drawImage(images.hinge, x - s / 2, y - s / 2, s, s);
+      _hingeTintCtx.clearRect(0, 0, s, s);
+      _hingeTintCtx.drawImage(images.hinge, 0, 0, s, s);
+      _hingeTintCtx.globalCompositeOperation = 'source-atop';
+      _hingeTintCtx.fillStyle = `rgba(${rgb}, ${0.35 + g * 0.55})`;
+      _hingeTintCtx.fillRect(0, 0, s, s);
+      _hingeTintCtx.globalCompositeOperation = 'source-over';
+      ctx.drawImage(_hingeTintCanvas, x - s / 2, y - s / 2, s, s);
     }
 
     this._drawSparkles(ctx);

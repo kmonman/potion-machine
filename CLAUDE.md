@@ -805,6 +805,24 @@ deploy with a proper HTTPS cert (even a free static host), not local network exp
       (`Background 1.png`) as the Home screen and the Game Over overlay**,
       drawn behind the rising fog layers instead of a flat solid fill — this
       screen was the only one still using a plain color background.
+  39. **Root cause of every hinge "extra pink/white shape" complaint this
+      session: I kept drawing a *separate* glow ring next to the sprite's own
+      ring instead of lighting up the real one.** Rob's phone screenshot made
+      it click: "center dot, then there's a pink that you added — remove it —
+      the outer dark ring is what needs to light up." Every version so far
+      (dots, ticks, dust, plain stroke) was a shape drawn at some radius I
+      picked, sitting near — but never exactly on — the sprite's actual ring,
+      which measures out to radius 42-49 in the source image (47-55 at the
+      112px display size, not the 32 I'd been using). Rebuilt the approach
+      entirely: instead of adding shapes, tint the sprite's *own* opaque pixels
+      directly via `globalCompositeOperation: 'source-atop'` on a small
+      reusable offscreen canvas (`_hingeTintCanvas`, isolated so the tint fill
+      can't bleed onto anything else already on the main canvas), then draw
+      that tinted copy in place of the plain sprite. `hingeRingRadius` updated
+      to 55 (the ring's real measured outer edge) so `Physics._checkHinge`'s
+      touch distance finally lines up with where the ball visually reaches the
+      real ring, not a made-up number. Verified both idle and touched states
+      live — single tinted ring+dot, no second shape anywhere near it.
 
 **Dev tooling note:** hit a caching issue while verifying the fixes above — the
 Browser-pane preview tool caches by *exact URL*, harder than a normal browser (even
