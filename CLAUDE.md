@@ -635,6 +635,31 @@ deploy with a proper HTTPS cert (even a free static host), not local network exp
       hinge bubbles instead of on top of both (`Platform.draw()` split into a
       base pass and a new `Platform.drawHinge()` so `Physics.draw()` — the ball —
       can run in between them).
+  24. **Follow-up: the "T" icon and score were both in the wrong spot, and I'd
+      misread what the "T" even was.** Went back to the source JSON one more
+      time and actually located the object that uses `Ball Off.png` — it's named
+      `GameOver2`, at real coordinates x=92 y=261 w=172 h=106. My fix #22
+      position (boardX+55, boardY+48, 100x62) had been an unverified guess from
+      *before* I'd found this object, and rendered too high/small, straddling
+      the board's top border instead of sitting inside it. Also found
+      `FinalScoreText`'s real anchor (x=586 y=253) — confirming the score shown
+      on this screen is a *separate* object from the small top-left HUD pill,
+      positioned inside the board on the same row as the icon.
+      This also resolved a standing misreading: I'd assumed the "T ·" in Rob's
+      reference was a player-name prefix (added in fix #17) and built a whole
+      name-display feature around that guess. It isn't — "T" is just the top of
+      the Ball Off icon's platform silhouette, and the dot is its ball. The real
+      Game Over screen shows no player name at all. Hid the name+score HUD pill
+      entirely once `isOver` (kept it for active gameplay, where nothing
+      contradicts it), and draw the score directly inside the board at
+      `FinalScoreText`'s real position instead.
+      Also: hinge bubble pink dialed back from fix #23's "more chroma" over-push
+      to a midpoint between the original tone and that one (Rob: "too pink
+      now"); the moon-phase overlay (`Difficulty.drawMoon`) moved to draw
+      alongside the ball, before the hinge/bubbles, matching the ball's own
+      fix #23 z-order — it had been left drawing last and rendering over both;
+      and "GAME OVER"'s glow switched from purple to white and toned down
+      (lower blur/opacity ceiling, smaller offset) per Rob's follow-up.
 
 **Dev tooling note:** hit a caching issue while verifying the fixes above — the
 Browser-pane preview tool caches by *exact URL*, harder than a normal browser (even

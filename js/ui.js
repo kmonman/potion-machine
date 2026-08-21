@@ -243,13 +243,13 @@ const PlayScreen = {
 
     Fog.draw(ctx, images);
     Platform.draw(ctx, images);
-    // Ball drawn behind the hinge glow/sprite and the hinge bubbles (Rob's ask) —
-    // previously drawn last, so it rendered on top of both instead of appearing
-    // to actually sit under/against the hinge.
+    // Ball (and its moon-phase overlay, same position) drawn behind the hinge
+    // glow/sprite and the hinge bubbles (Rob's ask) — previously drawn last, so
+    // both rendered on top instead of appearing to sit under/against the hinge.
     Physics.draw(ctx, images);
+    Difficulty.drawMoon(ctx, images);
     Platform.drawHinge(ctx, images);
     HingeBubbles.draw(ctx);
-    Difficulty.drawMoon(ctx, images);
 
     this._drawHud(ctx, images, sceneLabel);
 
@@ -257,26 +257,30 @@ const PlayScreen = {
   },
 
   _drawHud(ctx, images, sceneLabel) {
-    // Player name + separator dot, immediately left of the score bubble — matches
-    // the original's "Name · [score]" top-left summary, which this port previously
-    // dropped entirely (only the score bubble was ever drawn). Measured dynamically
-    // since names vary in width (up to the 16-char input limit).
-    ctx.save();
-    ctx.font = '28px PotionBody';
-    ctx.fillStyle = '#fff';
-    ctx.textAlign = 'left';
-    ctx.textBaseline = 'middle';
-    const nameStr = state.playerName + ' ·';
-    ctx.fillText(nameStr, 20, 72);
-    const nameWidth = ctx.measureText(nameStr).width;
-    ctx.restore();
+    // Player name + score pill — hidden once the run is over. What I originally
+    // read as a "T ·" player-name prefix in Rob's reference screenshot turned out
+    // to actually be the *fell-off icon* (Ball Off.png, a T-shaped platform +
+    // dot), not a name at all — the real Game Over screen shows no player name,
+    // just that icon and the score, both positioned inside the board itself (see
+    // _drawGameOver). Keeping the name+score pill for active gameplay, since
+    // there's no evidence either way there and it's a reasonable HUD addition.
+    if (!this.isOver) {
+      ctx.save();
+      ctx.font = '28px PotionBody';
+      ctx.fillStyle = '#fff';
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'middle';
+      const nameStr = state.playerName + ' ·';
+      ctx.fillText(nameStr, 20, 72);
+      const nameWidth = ctx.measureText(nameStr).width;
+      ctx.restore();
 
-    // Score, in its bubble container.
-    const pillX = 20 + nameWidth + 14;
-    if (images.bubbleScore) {
-      ctx.drawImage(images.bubbleScore, pillX, 20, 238, 104);
+      const pillX = 20 + nameWidth + 14;
+      if (images.bubbleScore) {
+        ctx.drawImage(images.bubbleScore, pillX, 20, 238, 104);
+      }
+      drawCenteredText(ctx, this._scoreText(), pillX + 40, 55, 170, { size: 34, font: 'PotionTitle', color: '#fff' });
     }
-    drawCenteredText(ctx, this._scoreText(), pillX + 40, 55, 170, { size: 34, font: 'PotionTitle', color: '#fff' });
 
     // Hidden once the run is over — matches the reference Game Over screenshot
     // (no mode/timer text up top there). Shifted into the upper-right (was
@@ -362,10 +366,18 @@ const PlayScreen = {
       drawImg(ctx, images.gameOverBoard, boardX, boardY, boardW, boardH);
 
       // "Ball fell off the platform" icon — a real asset (Ball Off.png: a small
-      // gray T-shaped platform silhouette with a pink dot beside it) that fix #18
-      // wrongly dropped, mistaking it for background bleed-through. Real position
-      // was boardX+55, boardY+48 in the original.
-      if (images.gameOverBallOff) drawImg(ctx, images.gameOverBallOff, boardX + 55, boardY + 48, 100, 62);
+      // gray T-shaped platform silhouette with a pink dot beside it), object name
+      // "GameOver2" in the source. Real position is x=92 y=261 w=172 h=106 in the
+      // 720x1280 scene — my first pass at this (boardX+55, boardY+48, 100x62) was
+      // an unverified guess made before I'd actually found this object in the
+      // source file, and sat noticeably too high/small.
+      if (images.gameOverBallOff) drawImg(ctx, images.gameOverBallOff, 92, 261, 172, 106);
+
+      // Final score — the source's own "FinalScoreText" object, anchored at
+      // x=586 y=253, i.e. inside the board on the same row as the icon above,
+      // not the small top-left HUD pill (which is hidden entirely once the run
+      // is over — see _drawHud).
+      drawCenteredText(ctx, this._scoreText(), 480, 253, 240, { size: 44, font: 'PotionTitle', color: '#fff' });
 
       // 3 potion-fill icons inside the board, at the original's own relative
       // position (x428/497/562 y311 out of the 720-wide scene).
@@ -382,16 +394,17 @@ const PlayScreen = {
       const w = 560, h = w * (images.gameOverText.height / images.gameOverText.width);
       // Slight glow + flicker concentrated toward the bottom of the letters —
       // two overlapping sine waves so it doesn't read as a perfectly regular
-      // pulse, more like an unstable neon sign.
+      // pulse, more like an unstable neon sign. White and more subtle per Rob's
+      // follow-up (was purple-tinted and too strong).
       const now = Date.now();
       const flicker = 0.7 + 0.3 * (0.6 * Math.sin(now / 180) + 0.4 * Math.sin(now / 47));
       ctx.save();
       ctx.globalAlpha = fadeIn;
       ctx.translate(360, 560 + h / 2);
       ctx.scale(t, t);
-      ctx.shadowColor = `rgba(190, 120, 255, ${Math.max(0, 0.7 * flicker)})`;
-      ctx.shadowBlur = 22 * flicker;
-      ctx.shadowOffsetY = 14;
+      ctx.shadowColor = `rgba(255, 255, 255, ${Math.max(0, 0.35 * flicker)})`;
+      ctx.shadowBlur = 12 * flicker;
+      ctx.shadowOffsetY = 8;
       drawImg(ctx, images.gameOverText, -w / 2, -h / 2, w, h);
       ctx.restore();
     }
