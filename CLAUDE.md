@@ -503,6 +503,11 @@ deploy with a proper HTTPS cert (even a free static host), not local network exp
       the browser console and screenshotting the canvas directly (`js/fog.js`'s
       `HingeBubbles`, `js/difficulty.js`'s `Difficulty.jets[i].particles`) —
       confirmed particle counts and visual density before shipping.
+  14. **Ball felt too floaty, not enough gravity.** `Physics.gravityY` raised
+      900→1500 px/s². Verified numerically: 1s of free fall now covers 747px
+      (vs. ~450px before). Confirmed on the live GitHub→Netlify pipeline, not a
+      one-off Drop upload — Rob confirmed the auto-deploy pipeline itself is
+      working correctly (right link this time).
 
 **Dev tooling note:** hit a caching issue while verifying the fixes above — the
 Browser-pane preview tool caches by *exact URL*, harder than a normal browser (even

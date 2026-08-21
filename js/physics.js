@@ -14,7 +14,7 @@ const Physics = {
   radius: 32,
   rotation: 0, // radians — visual spin, doesn't affect physics
 
-  gravityY: 900, // px/s^2, constant downward pull
+  gravityY: 1500, // px/s^2, constant downward pull — was 900, felt too floaty (Rob's feedback)
   tiltAccel: 1400, // px/s^2 at full tilt (tiltX = ±1)
   airDamping: 0.999,
 
