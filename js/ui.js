@@ -311,6 +311,10 @@ const PlayScreen = {
   draw(ctx, images, sceneLabel) {
     ctx.fillStyle = COLOR.bg;
     ctx.fillRect(0, 0, 720, 1280);
+    // Same dark-to-light gradient backdrop as the Home screen and the Game Over
+    // overlay (Background 1.png), sitting behind the rising fog layers rather
+    // than the plain flat fill this screen used before.
+    if (images.sky) drawImg(ctx, images.sky, -19, -17, 752, 1309);
 
     Fog.draw(ctx, images);
     Platform.draw(ctx, images);

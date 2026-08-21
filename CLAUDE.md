@@ -765,6 +765,28 @@ deploy with a proper HTTPS cert (even a free static host), not local network exp
       from a fairly saturated hot pink to a more muted purple-magenta, and the
       dust particles shrunk/dimmed and pulled in closer to the core so they read
       as a subtle texture rather than a prominent scattering of bright specks.
+  35. **The "white area" wasn't the hinge at all — it's the ball.** After Rob
+      kept seeing a white patch through several rounds of hinge-only tuning
+      (rotating dots → tick reticle → twinkling dust → dust removed entirely),
+      none of which fixed it, I sampled actual rendered pixel colors instead of
+      guessing again. With the ball placed at a realistic "touching" distance
+      (not dead-center on the pivot), the white patch is `Ball.png` itself — the
+      player's ball is a pale, moon-textured sprite (confirmed by opening the
+      asset directly), and at typical touching distance (threshold is ball
+      radius + hinge radius = 64px) it visually overlaps the hinge ring
+      substantially, since the ring is just a 32px-radius stroke and the ball's
+      display size is ~35px radius. This was never a hinge-drawing bug — every
+      fix this session was correctly changing the hinge, while the actual white
+      element was a completely different, unrelated object sitting on top of
+      it. Flagged this finding back to Rob rather than continuing to guess at
+      more hinge changes; still open, waiting on how he wants it handled (tint
+      the ball differently near the hinge? shrink the touching-distance
+      threshold so there's less overlap when it visually registers? something
+      else?).
+  36. **Gameplay background now uses the same dark-to-light gradient
+      (`Background 1.png`) as the Home screen and the Game Over overlay**,
+      drawn behind the rising fog layers instead of a flat solid fill — this
+      screen was the only one still using a plain color background.
 
 **Dev tooling note:** hit a caching issue while verifying the fixes above — the
 Browser-pane preview tool caches by *exact URL*, harder than a normal browser (even

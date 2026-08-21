@@ -27,18 +27,16 @@ const Platform = {
   timer: 0,
   direction: 1,
 
-  // Hinge glow + dust/emitter particles + sparkle burst while the ball is
-  // touching it. Rob's real reference screenshots (a "not touching" and a
-  // "touching" shot of the actual original game) showed this port's version was
-  // backwards (dimmer while touched — an earlier, unverified guess) and too flat
-  // at idle. Two follow-up misses on the way to this version: rotating emitter
-  // dots (nothing in the reference actually moves), then a fixed tick-mark
-  // "reticle" ring (too structured/mechanical — Rob: no solid shapes between the
-  // core and the outer ring, just emitters and dust). Settled on scattered
-  // soft twinkling dust particles at fixed random positions — no orbiting, no
-  // geometric pattern, just brightness flicker.
+  // Hinge glow + sparkle burst while the ball is touching it. Rob's real
+  // reference screenshots (a "not touching" and a "touching" shot of the actual
+  // original game) showed this port's version was backwards (dimmer while
+  // touched — an earlier, unverified guess) and too flat at idle. Several
+  // follow-up misses trying to add texture between the core and outer ring
+  // (rotating dots, a tick-mark reticle, twinkling dust) all ended up reading
+  // as some kind of stray white blob once tuned — dropped that idea entirely
+  // for now; just the ring and the sprite's own center dot, both reacting to
+  // touch.
   hingeGlow: 0, // 0 = idle, 1 = touched — brighter/warmer at 1, not dimmer
-  hingeDust: [], // {dx, dy, size, phase, speed} — positions fixed per reset(), only twinkle animates
   sparkles: [],
 
   reset() {
@@ -49,16 +47,6 @@ const Platform = {
     this.tweenElapsed = 0;
     this.timer = 0;
     this.hingeGlow = 0;
-    this.hingeDust = Array.from({ length: 12 }, () => {
-      const a = Math.random() * Math.PI * 2;
-      const r = 20 + Math.random() * 20;
-      return {
-        dx: Math.cos(a) * r, dy: Math.sin(a) * r,
-        size: 1.5 + Math.random() * 3,
-        phase: Math.random() * Math.PI * 2,
-        speed: 1.2 + Math.random() * 2,
-      };
-    });
     this.sparkles = [];
     this._initLiquid();
   },
@@ -165,22 +153,14 @@ const Platform = {
     ctx.stroke();
     ctx.restore();
 
-    // Soft dust/emitter particles scattered between the core and the ring — no
-    // solid shapes or geometric pattern, small and subtle rather than a
-    // prominent scattering of bright white specks.
-    const now = Date.now() / 1000;
-    for (const d of this.hingeDust) {
-      const twinkle = 0.5 + 0.5 * Math.sin(now * d.speed + d.phase);
-      const alpha = Math.min(0.7, 0.08 + (0.12 + g * 0.28) * twinkle);
-      ctx.save();
-      ctx.shadowColor = `rgba(${rgb}, 1)`;
-      ctx.shadowBlur = 3 + g * 5;
-      ctx.beginPath();
-      ctx.arc(x + d.dx * 0.7, y + d.dy * 0.7, d.size * 0.7 * (0.8 + g * 0.4), 0, Math.PI * 2);
-      ctx.fillStyle = `rgba(255, 255, 255, ${alpha})`;
-      ctx.fill();
-      ctx.restore();
-    }
+    // Dust particles between the core and ring went through several tuning
+    // passes (rotating dots, then a fixed tick pattern, then twinkling dust)
+    // and every version kept reading back as a "white area" once several of
+    // them sat this close together in this small a space, no matter how much
+    // the blur/alpha/color got dialed down. Removed outright — just the ring
+    // and the sprite's own center dot for now, both already changing with
+    // touch. Can revisit texture here later if it's still wanted once this
+    // simpler baseline is confirmed clean.
 
     // Hinge sprite (doesn't rotate). A white radial-gradient "core glow" used to
     // sit on top of this to make the center brighten on touch, but it read as a
