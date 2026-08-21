@@ -1,0 +1,77 @@
+@font-face {
+  font-family: 'PotionTitle';
+  src: url('../assets/BRLNSDB.TTF');
+}
+@font-face {
+  font-family: 'PotionBody';
+  src: url('../assets/mvboli.ttf');
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+  background: #0a0410;
+  overflow: hidden;
+  overscroll-behavior: none;
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+#viewport {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+#gameWrap {
+  position: relative;
+  width: 720px;
+  height: 1280px;
+  transform-origin: top left;
+  flex-shrink: 0;
+}
+
+#gameCanvas {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 720px;
+  height: 1280px;
+  display: block;
+}
+
+/* DOM overlay controls sit in the same 720x1280 coordinate space as the canvas
+   and scale together with it via #gameWrap's transform. */
+#nameInput {
+  position: absolute;
+  left: 88px;
+  top: 1066px;
+  width: 540px;
+  height: 72px;
+  font-family: 'PotionTitle', sans-serif;
+  font-size: 42px;
+  text-align: center;
+  color: rgb(144, 19, 254);
+  background: transparent;
+  border: none;
+  outline: none;
+  caret-color: rgb(144, 19, 254);
+  /* html/body sets touch-action:none and user-select:none game-wide so the canvas
+     doesn't scroll/zoom under touch — but that inherits down onto this input too,
+     and on real touchscreens touch-action:none can suppress the tap-to-focus
+     gesture entirely, silently preventing the on-screen keyboard from ever
+     appearing. Explicitly restore normal behavior for just this field. */
+  touch-action: manipulation;
+  -webkit-user-select: text;
+  user-select: text;
+}
+#nameInput::placeholder {
+  color: rgba(144, 19, 254, 0.55);
+}

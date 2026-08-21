@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>Potion Machine</title>
+<script>document.write('<link rel="stylesheet" href="css/style.css?v=' + Date.now() + '">');</script>
+</head>
+<body>
+
+<div id="viewport">
+  <div id="gameWrap">
+    <canvas id="gameCanvas" width="720" height="1280"></canvas>
+    <input id="nameInput" type="text" placeholder="Enter Name" maxlength="16" autocomplete="off" autocapitalize="words" spellcheck="false">
+  </div>
+</div>
+
+<!-- Load order matters: each later file uses globals defined by the ones before it.
+     Cache-busted with a timestamp query during dev (see below) so editor/browser
+     caching never serves a stale file while this is actively being worked on —
+     drop that before real deployment, where normal caching is a feature. -->
+<script>
+  const DEV_SCRIPTS = ['js/storage.js', 'js/input.js', 'js/leaderboard.js', 'js/fog.js', 'js/ui.js', 'js/platform.js', 'js/difficulty.js', 'js/physics.js', 'js/game.js'];
+  const v = Date.now();
+  document.write(DEV_SCRIPTS.map(s => `<script src="${s}?v=${v}"><\/script>`).join(''));
+</script>
+</body>
+</html>
