@@ -563,6 +563,27 @@ deploy with a proper HTTPS cert (even a free static host), not local network exp
       Verified live for both Free Play and Level 1 game-over states, plus active
       Free Play gameplay with a 6-letter test name, confirming no more overlap
       between the pill and the mode label.
+  18. **Follow-up: still didn't match — wrong proportions.** Fix #17 ported the
+      right button art but kept this port's own *invented* mid-screen "card"
+      layout (a solid backing rect, "You fell!"/"Time's up!" text, a duplicate
+      purple score number, a 3-potion fill row) — none of which exist in the real
+      game. Went back to the original project's own scene file and read the
+      actual x/y/width/height of every Game Over object instead of guessing:
+      `GameOver` (the bold text, using `GameOverText3.png` — a real asset that
+      was sitting right there in the source `assets/` folder, never ported)
+      sits at roughly 44% down the screen completely on its own, not inside any
+      card — the "card" (`GameOverBoard`/`GameOver11.png`) is just a very faint
+      glow outline against an already-90%-dark background, easy to mistake for
+      "no board at all" in a screenshot, which is effectively how Rob's reference
+      reads. `BottomButtons` sits pinned near the very bottom of the screen
+      (y≈914-1272 of 1280), nowhere near the card. Rebuilt `_drawGameOver` around
+      those real coordinates: full-screen dark fade (no solid card), the real
+      `GameOverText3.png` art sized/positioned proportionally to match, and the
+      button pill corrected to its real 855:358 aspect ratio (was squashed to
+      460:96 in fix #17, which read as flattened/wrong). Removed the now-unused
+      `_potionsFilled()` and the old board/potion/ball-off asset references.
+      Verified live — screenshot compared directly against Rob's reference,
+      matching layout order and proportions top-to-bottom now.
 
 **Dev tooling note:** hit a caching issue while verifying the fixes above — the
 Browser-pane preview tool caches by *exact URL*, harder than a normal browser (even

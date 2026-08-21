@@ -230,13 +230,6 @@ const PlayScreen = {
     return String(Math.floor(this.elapsed));
   },
 
-  _potionsFilled() {
-    if (this.score >= 2000) return 3;
-    if (this.score >= 1000) return 2;
-    if (this.score >= 500) return 1;
-    return 0;
-  },
-
   draw(ctx, images, sceneLabel) {
     ctx.fillStyle = COLOR.bg;
     ctx.fillRect(0, 0, 720, 1280);
@@ -318,52 +311,38 @@ const PlayScreen = {
     return s >= 1000 ? `${Math.floor(s / 1000)},${String(s % 1000).padStart(3, '0')}` : String(s);
   },
 
+  // Rebuilt to match the original's actual layout, pulled from the source project's
+  // own scene coordinates (not guessed) — a full-screen dark fade, the real "GAME
+  // OVER" art positioned about 44% down the screen (x50 y563 w624 out of the
+  // 720x1280 scene, independent of any card/board — there's no solid panel behind
+  // it, just the dark fade), and the button pill pinned near the bottom. The first
+  // version of this screen invented its own mid-screen "card" with a solid backing,
+  // a duplicate purple score readout, and a potion-fill row — none of which
+  // actually appear in the real game (confirmed against Rob's screenshot of it).
   _drawGameOver(ctx, images) {
-    const t = easeOutBack(this.gameOverT);
-    ctx.fillStyle = `rgba(0,0,0,${0.65 * Math.min(1, this.gameOverT * 2)})`;
+    ctx.fillStyle = `rgba(0,0,0,${0.85 * Math.min(1, this.gameOverT * 2)})`;
     ctx.fillRect(0, 0, 720, 1280);
 
-    const boardW = 759, boardH = 343, boardX = (720 - boardW) / 2, boardY = 460;
-    // GameOver11.png is a glowing border frame with a transparent interior (meant
-    // to sit over a solid card, which isn't a separate asset in the original) — fill
-    // a solid backing behind it or the panel looks like an empty outline.
-    roundRectPath(ctx, boardX + 20, boardY + 20, boardW - 40, boardH - 40, 30);
-    ctx.fillStyle = 'rgba(20, 8, 32, 0.92)';
-    ctx.fill();
-    if (images.gameOverBoard) drawImg(ctx, images.gameOverBoard, boardX, boardY, boardW, boardH);
-    if (images.gameOverBallOff) {
-      ctx.globalAlpha = 0.5;
-      drawImg(ctx, images.gameOverBallOff, boardX + 55, boardY + 48, 100, 62);
-      ctx.globalAlpha = 1;
-    }
-
-    drawCenteredText(ctx, this.timedOut ? "Time's up!" : 'You fell!', 0, boardY - 90, 720,
-      { size: 44, font: 'PotionTitle', color: '#fff' });
-
-    ctx.save();
-    ctx.translate(360, boardY + 90);
-    ctx.scale(t, t);
-    drawCenteredText(ctx, this._scoreText(), -300, -22, 600, { size: 46, font: 'PotionTitle', color: COLOR.purple });
-    ctx.restore();
-
-    // Potion fill row.
-    const filled = this._potionsFilled();
-    const potionY = boardY + 170, potionW = 72, potionH = 88, gap = 20;
-    const totalW = potionW * 3 + gap * 2;
-    let px = 360 - totalW / 2;
-    for (let i = 0; i < 3; i++) {
-      const img = i < filled ? images.potionFilled : images.potionEmpty;
-      if (img) drawImg(ctx, img, px, potionY, potionW, potionH);
-      px += potionW + gap;
+    const t = easeOutBack(this.gameOverT);
+    if (images.gameOverText) {
+      const w = 560, h = w * (images.gameOverText.height / images.gameOverText.width);
+      ctx.save();
+      ctx.globalAlpha = Math.min(1, this.gameOverT * 2);
+      ctx.translate(360, 560 + h / 2);
+      ctx.scale(t, t);
+      drawImg(ctx, images.gameOverText, -w / 2, -h / 2, w, h);
+      ctx.restore();
     }
 
     // Row of 3 round buttons (home / restart / 3rd shortcut) — one combined pill
     // image with 3 equal tap-zones, matching the original (previously this port
     // substituted its own plain text buttons because I'd assumed the original had
     // no real art here — it did, just uncopied). Free Play's 3rd icon opens the
-    // leaderboard; Level 1's opens the levels grid.
-    const barW = 460, barH = 96;
-    const barX = (720 - barW) / 2, barY = boardY + 260;
+    // leaderboard; Level 1's opens the levels grid. Sized at the source art's own
+    // aspect ratio (855x358 in the original scene) instead of the squashed 460x96
+    // this port used at first.
+    const barW = 430, barH = barW * (358 / 855);
+    const barX = (720 - barW) / 2, barY = 1090;
     const bottomImg = this.mode === 'level1' ? images.bottomButtonsLevels : images.bottomButtonsFreeplay;
     if (bottomImg) drawImg(ctx, bottomImg, barX, barY, barW, barH);
     this.bottomButtonsRect = { x: barX, y: barY, w: barW, h: barH };
