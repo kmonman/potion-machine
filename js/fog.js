@@ -72,17 +72,21 @@ const HingeBubbles = {
     if (emitting) {
       this.spawnTimer -= dt;
       if (this.spawnTimer <= 0) {
-        this.spawnTimer = 0.09; // a fairly steady stream while touched
-        this.bubbles.push({
-          x: x + (Math.random() - 0.5) * 24,
-          y: y + (Math.random() - 0.5) * 10,
-          r: 3 + Math.random() * 5,
-          speed: 90 + Math.random() * 60, // was 55-100; now rises much further before fading
-          wobblePhase: Math.random() * Math.PI * 2,
-          wobbleAmp: 8 + Math.random() * 14,
-          life: 3,
-          maxLife: 3,
-        });
+        // Dense cluster while touching — matches the intro art's thick bubble
+        // burst around the hinge, not a thin trickle (Rob: "a lot should flow up").
+        this.spawnTimer = 0.035;
+        for (let i = 0; i < 3; i++) {
+          this.bubbles.push({
+            x: x + (Math.random() - 0.5) * 34,
+            y: y + (Math.random() - 0.5) * 14,
+            r: 3 + Math.random() * 6,
+            speed: 90 + Math.random() * 70,
+            wobblePhase: Math.random() * Math.PI * 2,
+            wobbleAmp: 8 + Math.random() * 14,
+            life: 3,
+            maxLife: 3,
+          });
+        }
       }
     }
     for (const b of this.bubbles) {
@@ -100,7 +104,11 @@ const HingeBubbles = {
       const alpha = 0.5 * Math.min(1, (1 - t) * 5) * Math.min(1, t * 2.5);
       ctx.beginPath();
       ctx.arc(x, b.y, b.r, 0, Math.PI * 2);
-      ctx.strokeStyle = `rgba(180, 130, 255, ${Math.max(0, alpha)})`;
+      // Filled pink core + brighter rim — reads as a much thicker bubble cluster
+      // than the old thin purple outline, matching the intro art's look.
+      ctx.fillStyle = `rgba(230, 90, 220, ${Math.max(0, alpha * 0.35)})`;
+      ctx.fill();
+      ctx.strokeStyle = `rgba(255, 170, 245, ${Math.max(0, alpha)})`;
       ctx.lineWidth = 1.5;
       ctx.stroke();
     }

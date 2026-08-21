@@ -474,6 +474,35 @@ deploy with a proper HTTPS cert (even a free static host), not local network exp
       tube's end and drop vertically before the wall ever gets involved. Verified
       directly: at 90px past the edge it keeps falling untouched; past 100px it
       gets the soft bounce from fix #10.
+  12. **Moved from Netlify Drop to real GitHub → Netlify continuous deployment.**
+      Repo pushed to `github.com/kmonman/potion-machine`, connected to Netlify so
+      every future push auto-rebuilds the live site — no more manual re-drag of a
+      zip. Live at `https://lucent-baklava-e8131d.netlify.app`. One snag: Netlify's
+      new-project default now puts sites behind a login wall ("Visitor access" →
+      set to Private by default) — had to switch Project visibility to Public in
+      Netlify's site settings before the game was reachable by anyone without a
+      Netlify account.
+  13. **Hinge bubbles and jet plume both too weak compared to the intro-screen art.**
+      Rob pointed at the Home screen's own instructional illustration (the
+      "Watch out for fissure bumps!" / "Tilt to collide..." image, drawn from a
+      static asset — not live gameplay) as the target: a thick pink bubble cluster
+      at the hinge, and a tall blue upward plume at each active jet. The live
+      versions were much weaker than that reference:
+      - **Hinge bubbles** were a thin trickle (1 bubble every 0.09s, thin purple
+        outline only). Now spawns 3 at a time every 0.035s (~8x denser) with a
+        filled pink core, not just a purple outline.
+      - **Jets** only ever drew one static, motionless glow blob at the jet's
+        position while active — no upward motion at all, nothing like the tall
+        blue spike in the reference art. Added a continuous particle plume (small
+        blue circles spawned every 0.025s while the jet is active, rising and
+        drifting until they fade) layered on top of the existing glow. This is
+        purely decorative/ambient — separate from the actual gameplay "puff"
+        impulse that fires when the ball enters the jet's catch radius (fix #9's
+        `wasInRange` logic, untouched here).
+      Verified by manually driving both systems through ~40 update ticks each in
+      the browser console and screenshotting the canvas directly (`js/fog.js`'s
+      `HingeBubbles`, `js/difficulty.js`'s `Difficulty.jets[i].particles`) —
+      confirmed particle counts and visual density before shipping.
 
 **Dev tooling note:** hit a caching issue while verifying the fixes above — the
 Browser-pane preview tool caches by *exact URL*, harder than a normal browser (even

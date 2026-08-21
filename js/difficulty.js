@@ -98,7 +98,7 @@ const Difficulty = {
     this.phaseIndex = 0;
     this.phaseTimer = 0;
     this.phaseDuration = FREE_PLAY_PHASES[0].duration;
-    this.jets = JET_DEFS.map(() => ({ x: 0, y: 0, active: false, wasInRange: false }));
+    this.jets = JET_DEFS.map(() => ({ x: 0, y: 0, active: false, wasInRange: false, particles: [], spawnTimer: 0 }));
     this.jetCooldown = 0;
     this.tubeColor = [112, 43, 245];
     this.ballOpacity = 1;
@@ -156,29 +156,67 @@ const Difficulty = {
     if (this.jetCooldown > 0) this.jetCooldown = Math.max(0, this.jetCooldown - dt);
 
     for (const jet of this.jets) {
-      if (!jet.active) { jet.wasInRange = false; continue; }
-      const inRange = Math.abs(Physics.x - jet.x) < JET_CATCH_RADIUS;
-      // Fire only on the moment it *enters* the zone (wasn't in range last frame,
-      // is now) — a ball resting in the zone for multiple frames only gets one
-      // puff, not a puff every time the cooldown happens to clear.
-      if (inRange && !jet.wasInRange && this.jetCooldown === 0) {
-        Physics.vy = JET_IMPULSE_VY;
-        this.jetCooldown = JET_COOLDOWN;
+      if (jet.active) {
+        const inRange = Math.abs(Physics.x - jet.x) < JET_CATCH_RADIUS;
+        // Fire only on the moment it *enters* the zone (wasn't in range last frame,
+        // is now) — a ball resting in the zone for multiple frames only gets one
+        // puff, not a puff every time the cooldown happens to clear.
+        if (inRange && !jet.wasInRange && this.jetCooldown === 0) {
+          Physics.vy = JET_IMPULSE_VY;
+          this.jetCooldown = JET_COOLDOWN;
+        }
+        jet.wasInRange = inRange;
+
+        // Continuous rising plume while the jet vents — the intro art shows a
+        // tall blue upward spike, but the jet previously only had a static glow
+        // with no motion at all. This spawns a steady stream of small particles
+        // that drift upward and fade, independent of whether the ball is there.
+        jet.spawnTimer -= dt;
+        if (jet.spawnTimer <= 0) {
+          jet.spawnTimer = 0.025;
+          jet.particles.push({
+            x: jet.x + (Math.random() - 0.5) * 6,
+            y: jet.y,
+            vy: -(160 + Math.random() * 100),
+            drift: (Math.random() - 0.5) * 40,
+            r: 2.5 + Math.random() * 3,
+            life: 1,
+            maxLife: 1,
+          });
+        }
+      } else {
+        jet.wasInRange = false;
       }
-      jet.wasInRange = inRange;
+
+      for (const p of jet.particles) {
+        p.y += p.vy * dt;
+        p.x += p.drift * dt;
+        p.life -= dt;
+      }
+      jet.particles = jet.particles.filter((p) => p.life > 0);
     }
   },
 
   drawJets(ctx) {
     for (const jet of this.jets) {
-      if (!jet.active) continue;
-      const grad = ctx.createRadialGradient(jet.x, jet.y, 0, jet.x, jet.y, 22);
-      grad.addColorStop(0, 'rgba(200, 160, 255, 0.85)');
-      grad.addColorStop(1, 'rgba(200, 160, 255, 0)');
-      ctx.fillStyle = grad;
-      ctx.beginPath();
-      ctx.arc(jet.x, jet.y, 22, 0, Math.PI * 2);
-      ctx.fill();
+      if (jet.active) {
+        const grad = ctx.createRadialGradient(jet.x, jet.y, 0, jet.x, jet.y, 22);
+        grad.addColorStop(0, 'rgba(200, 160, 255, 0.85)');
+        grad.addColorStop(1, 'rgba(200, 160, 255, 0)');
+        ctx.fillStyle = grad;
+        ctx.beginPath();
+        ctx.arc(jet.x, jet.y, 22, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      // Rising plume particles (see _updateJets) — drawn even after the jet
+      // switches off so the last few puffs finish rising instead of vanishing.
+      for (const p of jet.particles) {
+        const t = Math.max(0, p.life / p.maxLife);
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.r * (0.5 + t * 0.5), 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(150, 210, 255, ${0.75 * t})`;
+        ctx.fill();
+      }
     }
   },
 
