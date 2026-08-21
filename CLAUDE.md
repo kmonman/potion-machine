@@ -595,6 +595,21 @@ deploy with a proper HTTPS cert (even a free static host), not local network exp
       a bigger centered version of that same bubble-pill art, positioned directly
       above the "GAME OVER" art, matching the panel style from his reference
       screenshot rather than inventing a new visual language for it.
+  21. **Follow-up: wrong panel.** Rob pointed at the exact same reference
+      screenshot again and clarified — the panel he wanted was the real
+      `GameOverBoard` card (fix #18 had removed it, believing it wasn't actually
+      visible in the reference), positioned right where the original scene data
+      already said it goes: x≈-20 y127 w759 h343, directly below the top-left HUD
+      pill so the two read as one continuous panel. That also explains a detail
+      in Rob's screenshot I'd misread the first time around — the faint "T"
+      silhouette with a small colored dot inside the panel isn't a drawn icon at
+      all, it's the actual platform pole + hinge showing through the board's
+      genuinely transparent interior (no solid backing — restored that too).
+      Put the 3 potion-fill icons back inside it at their real relative position
+      (x428/497/562 y311), and removed the oversized centered pill from fix #20,
+      which is what I'd built instead before this correction. Re-added
+      `_potionsFilled()` and the board/potion asset references that fix #18 had
+      dropped.
 
 **Dev tooling note:** hit a caching issue while verifying the fixes above — the
 Browser-pane preview tool caches by *exact URL*, harder than a normal browser (even

@@ -230,6 +230,13 @@ const PlayScreen = {
     return String(Math.floor(this.elapsed));
   },
 
+  _potionsFilled() {
+    if (this.score >= 2000) return 3;
+    if (this.score >= 1000) return 2;
+    if (this.score >= 500) return 1;
+    return 0;
+  },
+
   draw(ctx, images, sceneLabel) {
     ctx.fillStyle = COLOR.bg;
     ctx.fillRect(0, 0, 720, 1280);
@@ -325,18 +332,29 @@ const PlayScreen = {
 
     const t = easeOutBack(this.gameOverT);
 
-    // Score panel — a bigger, centered version of the same bubble-pill style as
-    // the top-left HUD (matches the "Name · [bubbles] score" panel in Rob's
-    // reference screenshot), positioned directly above the "GAME OVER" art for
-    // emphasis on this screen specifically.
-    if (images.bubbleScore) {
-      const pw = 320, ph = pw * (104 / 238);
-      const px = (720 - pw) / 2, py = 390;
+    // The board: a glow-outline frame (GameOver11.png) with a genuinely
+    // transparent interior — no solid backing. That transparency is exactly why
+    // Rob's reference screenshot shows a faint "T"-shaped silhouette with a small
+    // colored dot inside it near the top-left: that's not a drawn icon, it's the
+    // actual platform pole + hinge (already drawn earlier in this same frame)
+    // showing through the dark overlay. Positioned at the original's own
+    // coordinates (x≈-20 y127 w759 h343 in the 720x1280 scene) — it sits directly
+    // below the small top-left HUD pill (which ends at y124), close enough that
+    // the two read as one continuous panel, matching the reference exactly.
+    const boardX = (720 - 759) / 2, boardY = 127, boardW = 759, boardH = 343;
+    if (images.gameOverBoard) {
       ctx.save();
       ctx.globalAlpha = Math.min(1, this.gameOverT * 2);
-      drawImg(ctx, images.bubbleScore, px, py, pw, ph);
-      drawCenteredText(ctx, this._scoreText(), px + 55, py + ph / 2 - 24, pw - 65,
-        { size: 44, font: 'PotionTitle', color: '#fff' });
+      drawImg(ctx, images.gameOverBoard, boardX, boardY, boardW, boardH);
+
+      // 3 potion-fill icons inside the board, at the original's own relative
+      // position (x428/497/562 y311 out of the 720-wide scene).
+      const filled = this._potionsFilled();
+      const potionXs = [428, 497, 562];
+      potionXs.forEach((px, i) => {
+        const img = i < filled ? images.potionFilled : images.potionEmpty;
+        if (img) drawImg(ctx, img, px, 311, 72, 88);
+      });
       ctx.restore();
     }
 
