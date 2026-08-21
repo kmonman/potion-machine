@@ -513,6 +513,25 @@ deploy with a proper HTTPS cert (even a free static host), not local network exp
       fall-through gap on each side (the 100px boundary margin from fix #11 is
       untouched) without feeling as stubby as 520. Verified visually in a live
       Free Play session (not just the static Home-screen art).
+  16. **Music was never actually ported — only its mute *button* was.** The mute
+      icon/toggle (`toggleMute()`, `state.muted`, Storage-persisted) has existed
+      since Stage 1, but there was never an audio element for it to control — the
+      original's looping background track (`Moonlit Drift.mp3`) was left behind in
+      the source `assets/` folder and never copied into `html5-port/assets/`, and
+      no playback code existed anywhere in `js/`. (There's also an unused
+      "Moonlit Drift (Haunted Mix).mp3" in the original — checked the source JSON's
+      events and confirmed it's never actually triggered by anything, just an
+      uploaded-but-unwired asset, so it wasn't ported.)
+      Copied the real track in and added a `Music` object in `game.js`: one
+      `Audio` element, looped, volume 1. Browsers block audio autoplay-with-sound
+      until the page has had a real user gesture, so it doesn't try to play
+      immediately on boot — instead it attempts `.play()` on the first tap/keypress
+      anywhere on the page, and keeps retrying on subsequent ones if the first
+      attempt was still too early. `toggleMute()` now actually mutes/unmutes this
+      element instead of just flipping a decorative icon. Verified live: clicked
+      once, confirmed via the console that playback was actually running
+      (`Music.started === true`, `Music.el.paused === false`) and pointed at the
+      real copied file, not a 404.
 
 **Dev tooling note:** hit a caching issue while verifying the fixes above — the
 Browser-pane preview tool caches by *exact URL*, harder than a normal browser (even

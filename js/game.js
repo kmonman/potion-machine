@@ -56,6 +56,27 @@ const state = {
   motionDenied: false,
 };
 
+// ---------- Background music ----------
+// Original plays "Moonlit Drift.mp3" on a continuous loop from boot, across every
+// screen (there's no per-scene music, just one persistent track). Mobile/desktop
+// browsers block audio autoplay-with-sound until the page has seen at least one
+// real user gesture, so the element is created immediately but .play() is only
+// attempted starting with the first tap/keypress — and retried on every one after
+// that until it actually succeeds (a single blocked attempt shouldn't give up for good).
+const Music = {
+  el: new Audio('assets/Moonlit Drift.mp3'),
+  started: false,
+  tryStart() {
+    if (this.started) return;
+    this.el.play().then(() => { this.started = true; }).catch(() => {});
+  },
+};
+Music.el.loop = true;
+Music.el.volume = 1;
+Music.el.muted = state.muted;
+window.addEventListener('pointerdown', () => Music.tryStart());
+window.addEventListener('keydown', () => Music.tryStart());
+
 const images = {};
 
 // Retries on failure — matters on real phones with flaky mobile connections,
@@ -140,6 +161,7 @@ function enterPlayScreen(screen) {
 function toggleMute() {
   state.muted = !state.muted;
   Storage.setMuted(state.muted);
+  Music.el.muted = state.muted;
 }
 
 // ---------- Input wiring ----------
