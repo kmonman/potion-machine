@@ -29,6 +29,7 @@ const ASSET_PATHS = {
   gameOverText: 'assets/GameOverText3.png',
   gameOverBoard: 'assets/GameOver11.png',
   gameOverBallOff: 'assets/Ball Off.png',
+  bubblesFinal: 'assets/BubblesFinal.png',
   potionFilled: 'assets/Pink Potion Final_1.png',
   potionEmpty: 'assets/Pink Potion Empty.png',
   bubbleScore: 'assets/bubblescore3.png',

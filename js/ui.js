@@ -155,7 +155,12 @@ const LevelsScreen = {
 
 // Mask region for the Game Over score's bubble-up effect (shared between the
 // update tick that spawns/moves the particles and the draw call that clips them).
-const GO_BUBBLE_MASK = { x: 430, y: 175, w: 100, h: 118 };
+// Kept well inside GameOver11.png's actual visible border (measured directly from
+// the asset: the purple line sits at roughly x37-681 y186-412 of the drawn board,
+// not the board's own full x/y/w/h bounding box — that image has a lot of glow
+// padding around the real border). Previous values leaked past the top of the
+// line into the glow.
+const GO_BUBBLE_MASK = { x: 430, y: 200, w: 100, h: 95 };
 
 // ---------- Play screen (Level 1 / Free Play) ----------
 // Core ball-on-a-see-saw mechanic. Both modes still share the same difficulty
@@ -412,21 +417,25 @@ const PlayScreen = {
       // Bubble-up effect immediately left of the score, clipped to a mask so
       // the bubbles read as rising up out of the panel rather than floating
       // freely (Rob: "masked by the panel and bubbling up") — matches the
-      // original's own "BubbleMask" object over its equivalent effect.
+      // original's own "BubbleMask" object over its equivalent effect. Uses the
+      // real bubble art (BubblesFinal.png, cropped to one isolated glossy bubble
+      // near its top-right) instead of flat hand-drawn circles, for a more
+      // realistic look (Rob's follow-up ask).
+      const BUBBLE_SPRITE = { sx: 300, sy: 0, sw: 228, sh: 210 };
       ctx.save();
       ctx.beginPath();
       ctx.rect(GO_BUBBLE_MASK.x, GO_BUBBLE_MASK.y, GO_BUBBLE_MASK.w, GO_BUBBLE_MASK.h);
       ctx.clip();
-      for (const b of this.goBubbles) {
-        const x = b.x + Math.sin(b.wobblePhase) * b.wobbleAmp;
-        const edgeFade = Math.min(1, (b.y - (GO_BUBBLE_MASK.y - 10)) / 20);
-        ctx.beginPath();
-        ctx.arc(x, b.y, b.r, 0, Math.PI * 2);
-        ctx.fillStyle = `rgba(243, 55, 190, ${0.4 * edgeFade})`;
-        ctx.fill();
-        ctx.strokeStyle = `rgba(255, 108, 218, ${0.9 * edgeFade})`;
-        ctx.lineWidth = 1.5;
-        ctx.stroke();
+      if (images.bubblesFinal) {
+        for (const b of this.goBubbles) {
+          const x = b.x + Math.sin(b.wobblePhase) * b.wobbleAmp;
+          const edgeFade = Math.min(1, (b.y - (GO_BUBBLE_MASK.y - 10)) / 20);
+          if (edgeFade <= 0.01) continue;
+          ctx.globalAlpha = edgeFade;
+          ctx.drawImage(images.bubblesFinal, BUBBLE_SPRITE.sx, BUBBLE_SPRITE.sy, BUBBLE_SPRITE.sw, BUBBLE_SPRITE.sh,
+            x - b.r, b.y - b.r, b.r * 2, b.r * 2);
+        }
+        ctx.globalAlpha = 1;
       }
       ctx.restore();
 
@@ -435,12 +444,15 @@ const PlayScreen = {
       // not the small top-left HUD pill (which is hidden entirely once the run
       // is over — see _drawHud). Bigger and grey (matching "GAME OVER" itself)
       // per Rob's follow-up — it started out sized/colored like the small HUD
-      // pill's number instead of matching the big Game Over art.
+      // pill's number instead of matching the big Game Over art. x/w pulled in
+      // from the original's raw anchor — at the original width it ran past the
+      // board's real right border (measured at x≈681, not the board's full 759
+      // width, which has its own glow padding baked in).
       ctx.save();
       ctx.shadowColor = 'rgba(0, 0, 0, 0.45)';
       ctx.shadowBlur = 4;
       ctx.shadowOffsetY = 3;
-      drawCenteredText(ctx, this._scoreText(), 555, 233, 165, { size: 68, font: 'PotionTitle', color: '#c7c7c9' });
+      drawCenteredText(ctx, this._scoreText(), 520, 233, 150, { size: 68, font: 'PotionTitle', color: '#c7c7c9' });
       ctx.restore();
 
       // 3 potion-fill icons inside the board, at the original's own relative

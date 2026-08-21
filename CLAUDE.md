@@ -671,6 +671,19 @@ deploy with a proper HTTPS cert (even a free static host), not local network exp
       over its equivalent effect. This runs continuously while the Game Over
       screen is up (`PlayScreen._updateGoBubbles`), not tied to any player
       interaction.
+  26. **Bubbles should use the real bubble art, and the mask leaked past the
+      panel's actual border into its glow.** Measured `GameOver11.png`'s real
+      visible border directly (scanned the raw pixels rather than eyeballing
+      it) — the purple line sits at roughly x37-681 y186-412 of the drawn board,
+      quite a bit inside the image's own 759x343 bounding box, which carries a
+      lot of glow padding around that line. `GO_BUBBLE_MASK`'s top edge (y175)
+      and the score box's right edge (720) both extended past that real border,
+      which is why bubbles were visibly bleeding into the glow above the panel.
+      Pulled both in (mask now y200 h95; score box x520 w150, both comfortably
+      inside the measured line). Also swapped the hand-drawn `ctx.arc` circles
+      for the real `BubblesFinal.png` art (cropped to one isolated glossy bubble
+      near its top-right, ~228x210 of the 528x923 source) for a more realistic
+      look, per Rob's ask.
 
 **Dev tooling note:** hit a caching issue while verifying the fixes above — the
 Browser-pane preview tool caches by *exact URL*, harder than a normal browser (even
