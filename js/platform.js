@@ -170,13 +170,23 @@ const Platform = {
       _hingeTintCtx.fillStyle = `rgba(${rgb}, ${0.35 + g * 0.55})`;
       _hingeTintCtx.fillRect(0, 0, s, s);
       _hingeTintCtx.globalCompositeOperation = 'source-over';
-      // Actual glow this time — shadowBlur applies to the tinted sprite's own
+      // Outer colored glow — shadowBlur applies to the tinted sprite's own
       // opaque shape (the ring + dot), so it glows around its real edges
-      // rather than needing a second drawn shape. The tint-only version above
-      // had no glow at all, which is what Rob just flagged.
+      // rather than needing a second drawn shape.
       ctx.save();
       ctx.shadowColor = `rgba(${rgb}, 0.95)`;
       ctx.shadowBlur = 10 + g * 14;
+      ctx.drawImage(_hingeTintCanvas, x - s / 2, y - s / 2, s, s);
+      ctx.restore();
+
+      // Inner white-hot core, layered on top at reduced opacity with a
+      // tighter blur — classic neon-tube look (a bright near-white glow right
+      // at the tube itself, with the colored glow spreading further out
+      // around it), rather than a single flat colored glow.
+      ctx.save();
+      ctx.globalAlpha = 0.5 + g * 0.2;
+      ctx.shadowColor = `rgba(255, 255, 255, ${0.7 + g * 0.3})`;
+      ctx.shadowBlur = 3 + g * 4;
       ctx.drawImage(_hingeTintCanvas, x - s / 2, y - s / 2, s, s);
       ctx.restore();
     }

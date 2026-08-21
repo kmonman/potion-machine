@@ -830,6 +830,12 @@ deploy with a proper HTTPS cert (even a free static host), not local network exp
       shape (the ring + dot) the same way shadowBlur would around a stroked
       path. Color shifted from a pink/magenta blend to purple (140,70,230) →
       (175,85,255), brightening on touch rather than changing hue.
+  41. **Added an inner white-hot core for a neon-tube look**, on top of the
+      outer colored glow from fix #40 — a second `drawImage` of the same
+      tinted sprite, layered on top with a tight white `shadowBlur` at reduced
+      opacity, rather than just the one flat colored glow. Reads as a bright
+      light source with color spreading out around it, not a solid colored
+      shape.
 
 **Dev tooling note:** hit a caching issue while verifying the fixes above — the
 Browser-pane preview tool caches by *exact URL*, harder than a normal browser (even
