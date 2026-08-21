@@ -508,6 +508,11 @@ deploy with a proper HTTPS cert (even a free static host), not local network exp
       (vs. ~450px before). Confirmed on the live GitHub→Netlify pipeline, not a
       one-off Drop upload — Rob confirmed the auto-deploy pipeline itself is
       working correctly (right link this time).
+  15. **Tube felt too small after the 674→520 shortening (fix #10).** Widened
+      `Platform.length` back up to 620 — a middle ground that still leaves a real
+      fall-through gap on each side (the 100px boundary margin from fix #11 is
+      untouched) without feeling as stubby as 520. Verified visually in a live
+      Free Play session (not just the static Home-screen art).
 
 **Dev tooling note:** hit a caching issue while verifying the fixes above — the
 Browser-pane preview tool caches by *exact URL*, harder than a normal browser (even

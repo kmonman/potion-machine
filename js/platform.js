@@ -13,8 +13,9 @@ const Platform = {
   // enough to the screen edges that the ball couldn't actually fall down the gap
   // between the tube's end and the side wall — it would hit the wall-bounce trigger
   // and get knocked back before it had cleared the tube's end and dropped far
-  // enough to fall past it). 520 leaves a real gap on both sides.
-  length: 520,
+  // enough to fall past it). Widened back up 520→620 (Rob: felt too small) — the
+  // 100px fall-through margin (Physics._checkBoundaries) still gives room to drop.
+  length: 620,
   thickness: 52,
   poleHeight: 630,
 
