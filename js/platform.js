@@ -27,15 +27,14 @@ const Platform = {
   timer: 0,
   direction: 1,
 
-  // Hinge glow + emitter ring + sparkle burst while the ball is touching it.
+  // Hinge glow + reticle ring + sparkle burst while the ball is touching it.
   // Rob's real reference screenshots (a "not touching" and a "touching" shot of
-  // the actual original game) showed this port's version was both backwards
-  // (dimmer while touched — an earlier, unverified guess) and too flat even at
-  // idle: the real hinge has a visible glowing outer ring and small rotating
-  // "emitter" points active *at all times*, brightening further on touch,
-  // rather than just a soft blur that fades in.
-  hingeGlow: 0, // 0 = idle, 1 = touched — now brighter/warmer at 1, not dimmer
-  hingeEmitterPhase: 0, // drives the slow rotation of the emitter ring
+  // the actual original game) showed this port's version was backwards (dimmer
+  // while touched — an earlier, unverified guess) and too flat at idle. A first
+  // attempt at fixing it added small *rotating* emitter dots, but Rob caught
+  // that the reference doesn't show anything moving like that — it's a static
+  // gauge/reticle ring of fixed tick marks that brightens, not orbiting points.
+  hingeGlow: 0, // 0 = idle, 1 = touched — brighter/warmer at 1, not dimmer
   sparkles: [],
 
   reset() {
@@ -46,7 +45,6 @@ const Platform = {
     this.tweenElapsed = 0;
     this.timer = 0;
     this.hingeGlow = 0;
-    this.hingeEmitterPhase = 0;
     this.sparkles = [];
     this._initLiquid();
   },
@@ -75,9 +73,6 @@ const Platform = {
     const target = Physics.touchingHinge ? 1 : 0;
     const speed = target > this.hingeGlow ? 1 / 0.7 : 1 / 0.3;
     this.hingeGlow += (target - this.hingeGlow) * Math.min(1, dt * speed * 3);
-    // Emitters keep drifting even at idle (Rob: "not as dull as what we have"),
-    // spinning up further while touched.
-    this.hingeEmitterPhase += dt * (0.5 + this.hingeGlow * 1.4);
 
     if (Physics.touchingHinge) {
       for (let i = 0; i < 2; i++) {
@@ -162,21 +157,24 @@ const Platform = {
     ctx.stroke();
     ctx.restore();
 
-    // Small "emitter" points ringed around the hinge, slowly rotating even at
-    // idle so the whole thing reads as active/alive rather than a static glow —
-    // spin up and brighten further while touched.
-    const emitterCount = 8;
-    for (let i = 0; i < emitterCount; i++) {
-      const a = this.hingeEmitterPhase + (i / emitterCount) * Math.PI * 2;
-      const ex = x + Math.cos(a) * 34;
-      const ey = y + Math.sin(a) * 34;
+    // Static reticle/gauge ring — fixed short tick marks, not moving points
+    // (an earlier pass had these as slowly rotating dots; Rob caught that
+    // nothing in the reference actually moves like that — it's a fixed pattern
+    // that just brightens with the rest of the hinge).
+    const tickCount = 8;
+    for (let i = 0; i < tickCount; i++) {
+      const a = (i / tickCount) * Math.PI * 2;
+      const x1 = x + Math.cos(a) * 25, y1 = y + Math.sin(a) * 25;
+      const x2 = x + Math.cos(a) * 33, y2 = y + Math.sin(a) * 33;
       ctx.save();
       ctx.shadowColor = `rgba(${rgb}, 1)`;
-      ctx.shadowBlur = 5 + g * 9;
+      ctx.shadowBlur = 4 + g * 8;
       ctx.beginPath();
-      ctx.arc(ex, ey, 2.5 + g * 1.8, 0, Math.PI * 2);
-      ctx.fillStyle = `rgba(255, 255, 255, ${0.65 + g * 0.35})`;
-      ctx.fill();
+      ctx.moveTo(x1, y1);
+      ctx.lineTo(x2, y2);
+      ctx.strokeStyle = `rgba(255, 255, 255, ${0.55 + g * 0.4})`;
+      ctx.lineWidth = 2.5;
+      ctx.stroke();
       ctx.restore();
     }
 

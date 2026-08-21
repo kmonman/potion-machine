@@ -725,6 +725,14 @@ deploy with a proper HTTPS cert (even a free static host), not local network exp
       1=touched=brighter) rises. Verified both states live via a frozen-physics
       screenshot (couldn't rely on the normal game loop for a clean touching-state
       shot — same real-time-vs-tool-call-latency issue noted earlier in this log).
+  31. **Follow-up: no dots move around in the reference.** Rob caught that fix
+      #30's rotating emitter dots weren't actually in the reference images —
+      what looked like "emitter activity" there is a *static* gauge/reticle
+      pattern (fixed short tick marks around the ring) that brightens as a
+      whole, not points orbiting the hinge. Removed `hingeEmitterPhase` and the
+      rotation entirely; the 8 points are now fixed short radial line segments
+      at constant angles, brightening/glowing with `hingeGlow` like everything
+      else but never moving. Re-verified both states live.
 
 **Dev tooling note:** hit a caching issue while verifying the fixes above — the
 Browser-pane preview tool caches by *exact URL*, harder than a normal browser (even
