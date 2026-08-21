@@ -17,6 +17,7 @@ const Platform = {
   // 100px fall-through margin (Physics._checkBoundaries) still gives room to drop.
   length: 620,
   thickness: 52,
+  hingeRingRadius: 32, // matches the radius drawHinge() actually strokes at — Physics._checkHinge reads this so "touching" lines up with the visible ring, not a disconnected magic number
   poleHeight: 630,
 
   angle: 0, // degrees; positive = right end tilts down
@@ -147,7 +148,7 @@ const Platform = {
     ctx.shadowColor = `rgba(${rgb}, 0.85)`;
     ctx.shadowBlur = 6 + g * 8;
     ctx.beginPath();
-    ctx.arc(x, y, 32, 0, Math.PI * 2);
+    ctx.arc(x, y, this.hingeRingRadius, 0, Math.PI * 2);
     ctx.strokeStyle = `rgba(${rgb}, ${0.4 + g * 0.35})`;
     ctx.lineWidth = 2 + g * 1.5;
     ctx.stroke();

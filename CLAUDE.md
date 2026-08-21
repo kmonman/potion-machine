@@ -783,7 +783,25 @@ deploy with a proper HTTPS cert (even a free static host), not local network exp
       the ball differently near the hinge? shrink the touching-distance
       threshold so there's less overlap when it visually registers? something
       else?).
-  36. **Gameplay background now uses the same dark-to-light gradient
+  37. **Ball was visually sinking into the platform, and touch detection used
+      disconnected magic numbers.** Two related fixes, both from Rob:
+      - The ball rested using its *collision* radius (32) but draws ~3px larger
+        (`displayRadius`, 35, matching the original's oversized display art) —
+        so it always sat slightly embedded in the bar's surface instead of
+        cleanly on top. Added a `Physics.displayRadius` getter and rest against
+        that instead.
+      - "Touching the hinge" (which drives the bubbles, the timer/score-while-
+        touching, and the glow) used `32 + this.radius` — a leftover collision
+        radius unrelated to what's actually drawn. Bubbles/timer should start
+        as soon as any part of the ball reaches the hinge's real outer ring
+        (Rob: "includes the center dot and outer ring"), so this now reads
+        `Platform.hingeRingRadius + Physics.displayRadius` — both values tied
+        to the actual drawn sizes (32 and 35), not arbitrary constants.
+        `hingeRingRadius` is also now what `drawHinge()` itself strokes at, so
+        the two can't drift apart again. Verified the combined threshold (67px)
+        directly: touching flips true/false exactly at the ball's visual edge
+        reaching the ring's visual edge, not several pixels early or late.
+  38. **Gameplay background now uses the same dark-to-light gradient
       (`Background 1.png`) as the Home screen and the Game Over overlay**,
       drawn behind the rising fog layers instead of a flat solid fill — this
       screen was the only one still using a plain color background.

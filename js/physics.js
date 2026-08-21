@@ -12,6 +12,11 @@ const Physics = {
   x: 0, y: 0,
   vx: 0, vy: 0,
   radius: 32,
+  // The display sprite is drawn larger than the collision circle (see draw()),
+  // so resting the ball using the collision radius alone left it visually
+  // sunk ~3px into the platform's surface instead of sitting cleanly on top of
+  // it (Rob's ask) — rest against the display size instead.
+  get displayRadius() { return this.radius * 2.1875 / 2; },
   rotation: 0, // radians — visual spin, doesn't affect physics
 
   gravityY: 1500, // px/s^2, constant downward pull — was 900, felt too floaty (Rob's feedback)
@@ -73,7 +78,7 @@ const Physics = {
     const along = rx * dir.x + ry * dir.y;
     const perp = rx * normal.x + ry * normal.y;
 
-    const restPerp = -(p.thickness / 2 + this.radius);
+    const restPerp = -(p.thickness / 2 + this.displayRadius);
     const halfLength = p.length / 2;
 
     if (Math.abs(along) <= halfLength && perp > restPerp) {
@@ -123,11 +128,16 @@ const Physics = {
     }
   },
 
+  // "Touching" now means the ball's edge has reached the hinge's actual glow
+  // ring (its outer visible edge), not some disconnected collision radius —
+  // Rob: this should register anywhere from the center dot out to the outer
+  // ring, not just near dead center. Uses displayRadius since that's the
+  // ball's real drawn size, not the (slightly smaller) physics radius.
   _checkHinge() {
     const dx = this.x - Platform.pivot.x;
     const dy = this.y - Platform.pivot.y;
     const dist = Math.sqrt(dx * dx + dy * dy);
-    this.touchingHinge = dist < (32 + this.radius);
+    this.touchingHinge = dist < (Platform.hingeRingRadius + this.displayRadius);
   },
 
   // Free Play's "Potion Blast" power-up — a player-triggered impulse, direction
@@ -141,7 +151,7 @@ const Physics = {
 
   draw(ctx, images) {
     if (images.ball) {
-      const s = this.radius * 2.1875; // display art is slightly larger than the collision circle, matches original
+      const s = this.displayRadius * 2; // display art is slightly larger than the collision circle, matches original
       ctx.save();
       ctx.translate(this.x, this.y);
       ctx.rotate(this.rotation);
