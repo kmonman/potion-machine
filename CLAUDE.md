@@ -585,6 +585,17 @@ deploy with a proper HTTPS cert (even a free static host), not local network exp
       Verified live — screenshot compared directly against Rob's reference,
       matching layout order and proportions top-to-bottom now.
 
+  19. **Bottom button pill too small.** Scaled up 60% (`barW` 430→688, height
+      follows the same 855:358 aspect ratio so it stays unsquashed), repositioned
+      to stay pinned near the bottom with a small margin now that it's bigger
+      (was a fixed `barY`, now computed from the canvas height so it can't run
+      off the bottom edge as the size changes).
+  20. **Added a dedicated score panel above "GAME OVER".** Rob wanted a more
+      prominent score readout on this screen than the small top-left HUD pill —
+      a bigger centered version of that same bubble-pill art, positioned directly
+      above the "GAME OVER" art, matching the panel style from his reference
+      screenshot rather than inventing a new visual language for it.
+
 **Dev tooling note:** hit a caching issue while verifying the fixes above — the
 Browser-pane preview tool caches by *exact URL*, harder than a normal browser (even
 `location.reload(true)` didn't bust it; only navigating to a URL with a new query

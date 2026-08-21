@@ -324,6 +324,22 @@ const PlayScreen = {
     ctx.fillRect(0, 0, 720, 1280);
 
     const t = easeOutBack(this.gameOverT);
+
+    // Score panel — a bigger, centered version of the same bubble-pill style as
+    // the top-left HUD (matches the "Name · [bubbles] score" panel in Rob's
+    // reference screenshot), positioned directly above the "GAME OVER" art for
+    // emphasis on this screen specifically.
+    if (images.bubbleScore) {
+      const pw = 320, ph = pw * (104 / 238);
+      const px = (720 - pw) / 2, py = 390;
+      ctx.save();
+      ctx.globalAlpha = Math.min(1, this.gameOverT * 2);
+      drawImg(ctx, images.bubbleScore, px, py, pw, ph);
+      drawCenteredText(ctx, this._scoreText(), px + 55, py + ph / 2 - 24, pw - 65,
+        { size: 44, font: 'PotionTitle', color: '#fff' });
+      ctx.restore();
+    }
+
     if (images.gameOverText) {
       const w = 560, h = w * (images.gameOverText.height / images.gameOverText.width);
       ctx.save();
@@ -341,8 +357,8 @@ const PlayScreen = {
     // leaderboard; Level 1's opens the levels grid. Sized at the source art's own
     // aspect ratio (855x358 in the original scene) instead of the squashed 460x96
     // this port used at first.
-    const barW = 430, barH = barW * (358 / 855);
-    const barX = (720 - barW) / 2, barY = 1090;
+    const barW = 430 * 1.6, barH = barW * (358 / 855); // Rob: 60% bigger
+    const barX = (720 - barW) / 2, barY = 1280 - barH - 20; // pinned near the bottom with a small margin
     const bottomImg = this.mode === 'level1' ? images.bottomButtonsLevels : images.bottomButtonsFreeplay;
     if (bottomImg) drawImg(ctx, bottomImg, barX, barY, barW, barH);
     this.bottomButtonsRect = { x: barX, y: barY, w: barW, h: barH };
