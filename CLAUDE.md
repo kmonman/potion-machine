@@ -836,6 +836,9 @@ deploy with a proper HTTPS cert (even a free static host), not local network exp
       opacity, rather than just the one flat colored glow. Reads as a bright
       light source with color spreading out around it, not a solid colored
       shape.
+  42. **Inner core toned down** — alpha/shadow strength reduced (globalAlpha
+      0.5-0.7 → 0.32-0.46, shadow blur 3-7 → 2-5) so the white core reads as a
+      highlight rather than competing with the purple glow around it.
 
 **Dev tooling note:** hit a caching issue while verifying the fixes above — the
 Browser-pane preview tool caches by *exact URL*, harder than a normal browser (even

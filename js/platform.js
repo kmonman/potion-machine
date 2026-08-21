@@ -184,9 +184,9 @@ const Platform = {
       // at the tube itself, with the colored glow spreading further out
       // around it), rather than a single flat colored glow.
       ctx.save();
-      ctx.globalAlpha = 0.5 + g * 0.2;
-      ctx.shadowColor = `rgba(255, 255, 255, ${0.7 + g * 0.3})`;
-      ctx.shadowBlur = 3 + g * 4;
+      ctx.globalAlpha = 0.32 + g * 0.14;
+      ctx.shadowColor = `rgba(255, 255, 255, ${0.5 + g * 0.25})`;
+      ctx.shadowBlur = 2 + g * 3;
       ctx.drawImage(_hingeTintCanvas, x - s / 2, y - s / 2, s, s);
       ctx.restore();
     }
