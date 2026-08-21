@@ -83,6 +83,11 @@ const HingeBubbles = {
             speed: 90 + Math.random() * 70,
             wobblePhase: Math.random() * Math.PI * 2,
             wobbleAmp: 8 + Math.random() * 14,
+            // Persistent per-bubble sideways drift (separate from the wobble,
+            // which just oscillates around a fixed center) so the column leans
+            // and spreads a bit as it rises instead of staying a perfectly
+            // straight line (Rob's ask).
+            driftVx: (Math.random() - 0.5) * 22,
             life: 3,
             maxLife: 3,
           });
@@ -91,6 +96,7 @@ const HingeBubbles = {
     }
     for (const b of this.bubbles) {
       b.y -= b.speed * dt;
+      b.x += b.driftVx * dt;
       b.wobblePhase += dt * 1.5;
       b.life -= dt;
     }

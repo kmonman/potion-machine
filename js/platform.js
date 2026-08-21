@@ -27,14 +27,18 @@ const Platform = {
   timer: 0,
   direction: 1,
 
-  // Hinge glow + reticle ring + sparkle burst while the ball is touching it.
-  // Rob's real reference screenshots (a "not touching" and a "touching" shot of
-  // the actual original game) showed this port's version was backwards (dimmer
-  // while touched — an earlier, unverified guess) and too flat at idle. A first
-  // attempt at fixing it added small *rotating* emitter dots, but Rob caught
-  // that the reference doesn't show anything moving like that — it's a static
-  // gauge/reticle ring of fixed tick marks that brightens, not orbiting points.
+  // Hinge glow + dust/emitter particles + sparkle burst while the ball is
+  // touching it. Rob's real reference screenshots (a "not touching" and a
+  // "touching" shot of the actual original game) showed this port's version was
+  // backwards (dimmer while touched — an earlier, unverified guess) and too flat
+  // at idle. Two follow-up misses on the way to this version: rotating emitter
+  // dots (nothing in the reference actually moves), then a fixed tick-mark
+  // "reticle" ring (too structured/mechanical — Rob: no solid shapes between the
+  // core and the outer ring, just emitters and dust). Settled on scattered
+  // soft twinkling dust particles at fixed random positions — no orbiting, no
+  // geometric pattern, just brightness flicker.
   hingeGlow: 0, // 0 = idle, 1 = touched — brighter/warmer at 1, not dimmer
+  hingeDust: [], // {dx, dy, size, phase, speed} — positions fixed per reset(), only twinkle animates
   sparkles: [],
 
   reset() {
@@ -45,6 +49,16 @@ const Platform = {
     this.tweenElapsed = 0;
     this.timer = 0;
     this.hingeGlow = 0;
+    this.hingeDust = Array.from({ length: 12 }, () => {
+      const a = Math.random() * Math.PI * 2;
+      const r = 20 + Math.random() * 20;
+      return {
+        dx: Math.cos(a) * r, dy: Math.sin(a) * r,
+        size: 1.5 + Math.random() * 3,
+        phase: Math.random() * Math.PI * 2,
+        speed: 1.2 + Math.random() * 2,
+      };
+    });
     this.sparkles = [];
     this._initLiquid();
   },
@@ -127,71 +141,56 @@ const Platform = {
     const { x, y } = this.pivot;
     const g = this.hingeGlow; // 0 idle .. 1 touched — brighter/warmer at 1
 
-    // Cool purple idle -> warm pink/magenta touched.
+    // Muted purple/magenta blend — brightens/warms slightly on touch rather
+    // than shifting hue. Toned down from an earlier pass that pushed this
+    // toward a much more saturated hot pink than the reference actually shows.
     const c = [
-      Math.round(150 + (255 - 150) * g),
-      Math.round(80 + (55 - 80) * g),
-      Math.round(255 + (190 - 255) * g),
+      Math.round(175 + (225 - 175) * g),
+      Math.round(75 + (55 - 75) * g),
+      Math.round(220 + (195 - 220) * g),
     ];
     const rgb = c.join(',');
 
-    // Ambient fill glow behind everything — present at idle (not just a fade-in
-    // on touch), stronger while touched.
-    const fill = ctx.createRadialGradient(x, y, 0, x, y, 52);
-    fill.addColorStop(0, `rgba(${rgb}, ${0.28 + g * 0.32})`);
-    fill.addColorStop(1, `rgba(${rgb}, 0)`);
-    ctx.fillStyle = fill;
-    ctx.beginPath();
-    ctx.arc(x, y, 52, 0, Math.PI * 2);
-    ctx.fill();
-
-    // Crisp glowing outer ring — a real bright rim (not just a soft blur),
-    // thickening and lighting up further on touch.
+    // Just the ring's own edge glows (Rob) — no broad ambient fill flooding the
+    // area around it (an earlier pass had a large soft radial gradient here on
+    // top of the ring's own glow, which read as a big bright halo rather than a
+    // contained rim light).
     ctx.save();
-    ctx.shadowColor = `rgba(${rgb}, 0.9)`;
-    ctx.shadowBlur = 12 + g * 16;
+    ctx.shadowColor = `rgba(${rgb}, 0.85)`;
+    ctx.shadowBlur = 6 + g * 8;
     ctx.beginPath();
-    ctx.arc(x, y, 46, 0, Math.PI * 2);
-    ctx.strokeStyle = `rgba(${rgb}, ${0.5 + g * 0.4})`;
-    ctx.lineWidth = 3 + g * 2.5;
+    ctx.arc(x, y, 32, 0, Math.PI * 2);
+    ctx.strokeStyle = `rgba(${rgb}, ${0.4 + g * 0.35})`;
+    ctx.lineWidth = 2 + g * 1.5;
     ctx.stroke();
     ctx.restore();
 
-    // Static reticle/gauge ring — fixed short tick marks, not moving points
-    // (an earlier pass had these as slowly rotating dots; Rob caught that
-    // nothing in the reference actually moves like that — it's a fixed pattern
-    // that just brightens with the rest of the hinge).
-    const tickCount = 8;
-    for (let i = 0; i < tickCount; i++) {
-      const a = (i / tickCount) * Math.PI * 2;
-      const x1 = x + Math.cos(a) * 25, y1 = y + Math.sin(a) * 25;
-      const x2 = x + Math.cos(a) * 33, y2 = y + Math.sin(a) * 33;
+    // Soft dust/emitter particles scattered between the core and the ring — no
+    // solid shapes or geometric pattern, small and subtle rather than a
+    // prominent scattering of bright white specks.
+    const now = Date.now() / 1000;
+    for (const d of this.hingeDust) {
+      const twinkle = 0.5 + 0.5 * Math.sin(now * d.speed + d.phase);
+      const alpha = Math.min(0.7, 0.08 + (0.12 + g * 0.28) * twinkle);
       ctx.save();
       ctx.shadowColor = `rgba(${rgb}, 1)`;
-      ctx.shadowBlur = 4 + g * 8;
+      ctx.shadowBlur = 3 + g * 5;
       ctx.beginPath();
-      ctx.moveTo(x1, y1);
-      ctx.lineTo(x2, y2);
-      ctx.strokeStyle = `rgba(255, 255, 255, ${0.55 + g * 0.4})`;
-      ctx.lineWidth = 2.5;
-      ctx.stroke();
+      ctx.arc(x + d.dx * 0.7, y + d.dy * 0.7, d.size * 0.7 * (0.8 + g * 0.4), 0, Math.PI * 2);
+      ctx.fillStyle = `rgba(255, 255, 255, ${alpha})`;
+      ctx.fill();
       ctx.restore();
     }
 
-    // Hinge sprite (doesn't rotate) + a bright core glow on top that intensifies
-    // on touch, matching "the center ball of the hinge... increases" from Rob's
-    // description.
+    // Hinge sprite (doesn't rotate). A white radial-gradient "core glow" used to
+    // sit on top of this to make the center brighten on touch, but it read as a
+    // stray whitish circle rather than a natural highlight — removed. The
+    // sprite's own center dot plus the ambient fill glow behind everything
+    // already carries the brightening.
     if (images.hinge) {
       const s = 112;
       ctx.drawImage(images.hinge, x - s / 2, y - s / 2, s, s);
     }
-    const core = ctx.createRadialGradient(x, y, 0, x, y, 17);
-    core.addColorStop(0, `rgba(255, 255, 255, ${0.4 + g * 0.45})`);
-    core.addColorStop(1, `rgba(${rgb}, 0)`);
-    ctx.fillStyle = core;
-    ctx.beginPath();
-    ctx.arc(x, y, 17, 0, Math.PI * 2);
-    ctx.fill();
 
     this._drawSparkles(ctx);
 

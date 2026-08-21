@@ -733,6 +733,38 @@ deploy with a proper HTTPS cert (even a free static host), not local network exp
       rotation entirely; the 8 points are now fixed short radial line segments
       at constant angles, brightening/glowing with `hingeGlow` like everything
       else but never moving. Re-verified both states live.
+  32. **Follow-up round: still not matching.** Three more corrections from Rob,
+      all against the same two reference screenshots:
+      - The tick-mark reticle from fix #31 was itself the problem — Rob: no
+        solid structures between the core and outer ring at all, only emitters
+        and dust. Replaced it with `hingeDust`: 12 small soft particles at fixed
+        random positions (set once per `Platform.reset()`, an annulus between
+        radius 20-40), each only twinkling in brightness (individual random
+        phase/speed via `Date.now()`), never moving or orbiting.
+      - The color was "purplish" — the idle→touched lerp drifted toward
+        blue-purple (150,80,255) at rest. Both reference shots read pink/magenta
+        regardless of touch state, so the whole lerp shifted into that family
+        (215,45,200) → (255,35,160): brightens/warms, doesn't change hue family.
+      - A white radial-gradient "core glow" meant to brighten the center on
+        touch instead read as a stray whitish circle sitting on the hinge —
+        removed outright; the sprite's own center dot plus the ambient fill
+        glow already carries that brightening. Confirmed gone via a fresh
+        screenshot (0 white circle) before pushing.
+  33. **Hinge bubbles drift now** — added a persistent per-bubble `driftVx`
+      (separate from the existing wobble, which just oscillates around a fixed
+      center) so the rising column leans/spreads gradually instead of staying a
+      perfectly straight vertical line.
+  34. **Fix #32/33 overshot — too big, too bright, too saturated, wrong glow
+      shape.** Rob put a screenshot of that version directly next to the "413"
+      reference and it was clearly oversized/overbright by comparison. Also:
+      "just the outer edge of the ring glows" — the broad ambient radial-gradient
+      fill I'd layered *behind* the ring (radius 52, on top of the ring's own
+      glow) was reading as a big soft halo flooding the area around the hinge,
+      not a contained rim light on the ring itself. Removed that fill entirely.
+      Ring radius 46→32, lineWidth/shadowBlur roughly halved, color pulled back
+      from a fairly saturated hot pink to a more muted purple-magenta, and the
+      dust particles shrunk/dimmed and pulled in closer to the core so they read
+      as a subtle texture rather than a prominent scattering of bright specks.
 
 **Dev tooling note:** hit a caching issue while verifying the fixes above — the
 Browser-pane preview tool caches by *exact URL*, harder than a normal browser (even
