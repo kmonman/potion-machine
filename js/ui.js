@@ -153,6 +153,10 @@ const LevelsScreen = {
   },
 };
 
+// Mask region for the Game Over score's bubble-up effect (shared between the
+// update tick that spawns/moves the particles and the draw call that clips them).
+const GO_BUBBLE_MASK = { x: 430, y: 175, w: 100, h: 118 };
+
 // ---------- Play screen (Level 1 / Free Play) ----------
 // Core ball-on-a-see-saw mechanic. Both modes still share the same difficulty
 // script (Level 1's own fixed schedule isn't built yet — see CLAUDE.md), but they
@@ -167,6 +171,8 @@ const PlayScreen = {
   timedOut: false,
   gameOverT: 0, // 0-1 pop-in progress once the run has ended
   leaderboardMsgT: 0, // >0 while the "coming soon" message is showing
+  goBubbles: [], // continuously-bubbling particles next to the Game Over score
+  goBubbleTimer: 0,
 
   // Free Play only: a charge every 1000 points, tap a blast button to spend one.
   blastCharges: 0,
@@ -186,6 +192,8 @@ const PlayScreen = {
     this.timedOut = false;
     this.gameOverT = 0;
     this.leaderboardMsgT = 0;
+    this.goBubbles = [];
+    this.goBubbleTimer = 0;
     this.blastCharges = 0;
     this.blastThreshold = 0;
   },
@@ -212,7 +220,35 @@ const PlayScreen = {
       HingeBubbles.update(dt, false, Platform.pivot.x, Platform.pivot.y);
       this.gameOverT = Math.min(1, this.gameOverT + dt / 0.35);
       if (this.leaderboardMsgT > 0) this.leaderboardMsgT = Math.max(0, this.leaderboardMsgT - dt);
+      this._updateGoBubbles(dt);
     }
+  },
+
+  // Small continuous bubble-up effect next to the Game Over score, clipped to a
+  // mask so bubbles appear to rise up out of the panel rather than float freely
+  // (matches the original's own "BubbleMask" object over its equivalent effect).
+  _updateGoBubbles(dt) {
+    const m = GO_BUBBLE_MASK;
+    this.goBubbleTimer -= dt;
+    if (this.goBubbleTimer <= 0) {
+      this.goBubbleTimer = 0.12;
+      this.goBubbles.push({
+        x: m.x + m.w / 2 + (Math.random() - 0.5) * m.w * 0.7,
+        y: m.y + m.h + 10,
+        r: 4 + Math.random() * 7,
+        speed: 30 + Math.random() * 25,
+        wobblePhase: Math.random() * Math.PI * 2,
+        wobbleAmp: 6 + Math.random() * 10,
+        life: 0,
+        maxLife: (m.h + 30) / (30 + 12.5), // roughly the time to drift from bottom to top
+      });
+    }
+    for (const b of this.goBubbles) {
+      b.y -= b.speed * dt;
+      b.wobblePhase += dt * 1.4;
+      b.life += dt;
+    }
+    this.goBubbles = this.goBubbles.filter((b) => b.y > m.y - 10);
   },
 
   showLeaderboardComingSoon() {
@@ -373,11 +409,39 @@ const PlayScreen = {
       // source file, and sat noticeably too high/small.
       if (images.gameOverBallOff) drawImg(ctx, images.gameOverBallOff, 92, 261, 172, 106);
 
+      // Bubble-up effect immediately left of the score, clipped to a mask so
+      // the bubbles read as rising up out of the panel rather than floating
+      // freely (Rob: "masked by the panel and bubbling up") — matches the
+      // original's own "BubbleMask" object over its equivalent effect.
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(GO_BUBBLE_MASK.x, GO_BUBBLE_MASK.y, GO_BUBBLE_MASK.w, GO_BUBBLE_MASK.h);
+      ctx.clip();
+      for (const b of this.goBubbles) {
+        const x = b.x + Math.sin(b.wobblePhase) * b.wobbleAmp;
+        const edgeFade = Math.min(1, (b.y - (GO_BUBBLE_MASK.y - 10)) / 20);
+        ctx.beginPath();
+        ctx.arc(x, b.y, b.r, 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(243, 55, 190, ${0.4 * edgeFade})`;
+        ctx.fill();
+        ctx.strokeStyle = `rgba(255, 108, 218, ${0.9 * edgeFade})`;
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+      }
+      ctx.restore();
+
       // Final score — the source's own "FinalScoreText" object, anchored at
       // x=586 y=253, i.e. inside the board on the same row as the icon above,
       // not the small top-left HUD pill (which is hidden entirely once the run
-      // is over — see _drawHud).
-      drawCenteredText(ctx, this._scoreText(), 480, 253, 240, { size: 44, font: 'PotionTitle', color: '#fff' });
+      // is over — see _drawHud). Bigger and grey (matching "GAME OVER" itself)
+      // per Rob's follow-up — it started out sized/colored like the small HUD
+      // pill's number instead of matching the big Game Over art.
+      ctx.save();
+      ctx.shadowColor = 'rgba(0, 0, 0, 0.45)';
+      ctx.shadowBlur = 4;
+      ctx.shadowOffsetY = 3;
+      drawCenteredText(ctx, this._scoreText(), 555, 233, 165, { size: 68, font: 'PotionTitle', color: '#c7c7c9' });
+      ctx.restore();
 
       // 3 potion-fill icons inside the board, at the original's own relative
       // position (x428/497/562 y311 out of the 720-wide scene).

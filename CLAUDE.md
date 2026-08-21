@@ -660,6 +660,17 @@ deploy with a proper HTTPS cert (even a free static host), not local network exp
       fix #23 z-order — it had been left drawing last and rendering over both;
       and "GAME OVER"'s glow switched from purple to white and toned down
       (lower blur/opacity ceiling, smaller offset) per Rob's follow-up.
+  25. **Score needed to be bigger/grey with bubbles rising next to it.** The
+      score number was still styled like the small HUD pill's number (44px,
+      white/PotionTitle) rather than matching "GAME OVER" itself — bumped to
+      68px with a grey fill (`#c7c7c9`) and a subtle drop shadow, matching that
+      art's weight/color. Also added a small continuous bubble-up particle
+      effect immediately left of the score, clipped to a fixed rectangular mask
+      (`GO_BUBBLE_MASK`) so bubbles fade in/out at the mask edges instead of
+      just floating freely — matches the original's own "BubbleMask" object
+      over its equivalent effect. This runs continuously while the Game Over
+      screen is up (`PlayScreen._updateGoBubbles`), not tied to any player
+      interaction.
 
 **Dev tooling note:** hit a caching issue while verifying the fixes above — the
 Browser-pane preview tool caches by *exact URL*, harder than a normal browser (even
