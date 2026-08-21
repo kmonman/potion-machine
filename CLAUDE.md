@@ -684,6 +684,11 @@ deploy with a proper HTTPS cert (even a free static host), not local network exp
       for the real `BubblesFinal.png` art (cropped to one isolated glossy bubble
       near its top-right, ~228x210 of the 528x923 source) for a more realistic
       look, per Rob's ask.
+  27. **Bubbles snapped to full opacity right at the mask's bottom edge** — only
+      the top had a fade-out, so new bubbles looked like they were "coming out
+      of a line" instead of emerging gradually. Added a matching bottom fade-in
+      (~25px), so `edgeFade` is now the min of a top fade and a bottom fade
+      rather than just the top one.
 
 **Dev tooling note:** hit a caching issue while verifying the fixes above — the
 Browser-pane preview tool caches by *exact URL*, harder than a normal browser (even

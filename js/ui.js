@@ -427,9 +427,16 @@ const PlayScreen = {
       ctx.rect(GO_BUBBLE_MASK.x, GO_BUBBLE_MASK.y, GO_BUBBLE_MASK.w, GO_BUBBLE_MASK.h);
       ctx.clip();
       if (images.bubblesFinal) {
+        const maskBottom = GO_BUBBLE_MASK.y + GO_BUBBLE_MASK.h;
         for (const b of this.goBubbles) {
           const x = b.x + Math.sin(b.wobblePhase) * b.wobbleAmp;
-          const edgeFade = Math.min(1, (b.y - (GO_BUBBLE_MASK.y - 10)) / 20);
+          // Fades at both the top (fully faded out before reaching the border
+          // line) and the bottom (fades IN over ~25px instead of snapping to
+          // full opacity right at the mask edge, which read as bubbles
+          // "coming out of a line" rather than emerging gradually).
+          const topFade = Math.min(1, Math.max(0, (b.y - GO_BUBBLE_MASK.y) / 20));
+          const bottomFade = Math.min(1, Math.max(0, (maskBottom - b.y) / 25));
+          const edgeFade = Math.min(topFade, bottomFade);
           if (edgeFade <= 0.01) continue;
           ctx.globalAlpha = edgeFade;
           ctx.drawImage(images.bubblesFinal, BUBBLE_SPRITE.sx, BUBBLE_SPRITE.sy, BUBBLE_SPRITE.sw, BUBBLE_SPRITE.sh,
