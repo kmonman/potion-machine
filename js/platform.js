@@ -120,9 +120,15 @@ const Platform = {
     // HingeMagic — ambient smoke, same real params (flow 2/s, force 1-3, life
     // 2-4s, grows to 30px) constantly regardless of touch state (Rob: undid
     // the idle-specific tuning — keep this identical whether touching or not).
+    // `while`, not `if` — a slower/less consistent frame rate (mobile)
+    // otherwise silently caps the real spawn rate at the frame rate instead
+    // of the intended flow rate, same root cause as the jets reading thin on
+    // the phone (Rob).
     this.hingeMagicTimer -= dt;
-    if (this.hingeMagicTimer <= 0) {
-      this.hingeMagicTimer = 0.5; // flow=2/s
+    let magicGuard = 0;
+    while (this.hingeMagicTimer <= 0 && magicGuard < 30) {
+      this.hingeMagicTimer += 0.5; // flow=2/s
+      magicGuard++;
       const a = Math.random() * Math.PI * 2;
       const force = 1 + Math.random() * 2;
       this.hingeMagicParticles.push({
@@ -146,8 +152,10 @@ const Platform = {
     // wants that always-on) — was ramped 3→60/s with hingeGlow before.
     const sparkFlow = 60;
     this.hingeSparkTimer -= dt;
-    if (this.hingeSparkTimer <= 0) {
-      this.hingeSparkTimer = 1 / sparkFlow;
+    let sparkGuard = 0;
+    while (this.hingeSparkTimer <= 0 && sparkGuard < 30) {
+      this.hingeSparkTimer += 1 / sparkFlow;
+      sparkGuard++;
       const a = Math.random() * Math.PI * 2;
       const spawnR = Math.random() * 30;
       const force = 50 + Math.random() * 40;

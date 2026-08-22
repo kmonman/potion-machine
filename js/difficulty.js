@@ -174,9 +174,19 @@ const Difficulty = {
         // additive, zoneRadius 4, texture LightGlow.png. My hand-guessed
         // version (slow drifting 2.5-5.5px dots) was nowhere close — this is a
         // tight, fast, large glowing column, not a lazy sprinkle.
+        // `while` (not `if`) so a big/late frame catches up and spawns
+        // several particles at once instead of just one — on a slower or
+        // less consistent frame rate (mobile), `if` silently caps the real
+        // spawn rate at however many frames actually render per second
+        // instead of the intended 100/s, which is exactly why the jets read
+        // thin/weak on the phone (Rob) even though nothing about the flow
+        // rate itself changed. Capped so one huge stall can't spawn hundreds
+        // at once.
+        let spawnGuard = 0;
         jet.spawnTimer -= dt;
-        if (jet.spawnTimer <= 0) {
-          jet.spawnTimer = 0.01; // flow=100/s
+        while (jet.spawnTimer <= 0 && spawnGuard < 30) {
+          jet.spawnTimer += 0.01; // flow=100/s
+          spawnGuard++;
           const spread = (Math.random() - 0.5) * (2 * Math.PI / 180); // ~1° angle spread
           const force = 300 + Math.random() * 300;
           jet.particles.push({

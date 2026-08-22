@@ -71,10 +71,15 @@ const HingeBubbles = {
   update(dt, emitting, x, y) {
     if (emitting) {
       this.spawnTimer -= dt;
-      if (this.spawnTimer <= 0) {
+      // `while`, not `if` — same fix as the jets/hinge particles: on a
+      // slower/less consistent frame rate (mobile) this otherwise caps the
+      // real spawn rate at the frame rate instead of the intended one.
+      let bubbleGuard = 0;
+      while (this.spawnTimer <= 0 && bubbleGuard < 20) {
         // Dense cluster while touching — matches the intro art's thick bubble
         // burst around the hinge, not a thin trickle (Rob: "a lot should flow up").
-        this.spawnTimer = 0.035;
+        this.spawnTimer += 0.035;
+        bubbleGuard++;
         for (let i = 0; i < 3; i++) {
           this.bubbles.push({
             x: x + (Math.random() - 0.5) * 34,

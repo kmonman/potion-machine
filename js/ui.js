@@ -341,8 +341,12 @@ const PlayScreen = {
   _updateGoBubbles(dt) {
     const m = this._goScoreLayout().mask;
     this.goBubbleTimer -= dt;
-    if (this.goBubbleTimer <= 0) {
-      this.goBubbleTimer = 0.12;
+    // `while`, not `if` — same frame-rate-independence fix as the jets/hinge
+    // particles (see difficulty.js/platform.js).
+    let goBubbleGuard = 0;
+    while (this.goBubbleTimer <= 0 && goBubbleGuard < 20) {
+      this.goBubbleTimer += 0.12;
+      goBubbleGuard++;
       this.goBubbles.push({
         x: m.x + m.w / 2 + (Math.random() - 0.5) * m.w * 0.7,
         y: m.y + m.h + 10,
