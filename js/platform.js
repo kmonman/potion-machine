@@ -7,17 +7,10 @@ function easeInOutSine(t) {
   return -(Math.cos(Math.PI * t) - 1) / 2;
 }
 
-// Offscreen scratch canvas for tinting the hinge sprite's own pixels (see
-// Platform.drawHinge) — reused every frame rather than allocated fresh, and
-// kept isolated from the main canvas so the tint fill can't bleed onto
+// Offscreen scratch canvas for tinting particle textures per-frame (see
+// drawTintedParticle) — reused every particle rather than allocated fresh,
+// and kept isolated from the main canvas so the tint fill can't bleed onto
 // anything else already drawn there.
-const _hingeTintCanvas = document.createElement('canvas');
-_hingeTintCanvas.width = 112;
-_hingeTintCanvas.height = 112;
-const _hingeTintCtx = _hingeTintCanvas.getContext('2d');
-
-// Same trick, reused per-particle for the hinge's magic-smoke/spark emitters
-// (see drawHinge) — small enough to redraw every particle every frame cheaply.
 const _particleTintCanvas = document.createElement('canvas');
 _particleTintCanvas.width = 40;
 _particleTintCanvas.height = 40;
@@ -239,31 +232,9 @@ const Platform = {
     ];
     const rgb = c.join(',');
 
-    // Every earlier pass here drew a *separate* glow ring next to the sprite's
-    // own outer ring, which is what Rob was actually seeing as "a pink I
-    // added" that needed removing — the sprite's real ring sits at a much
-    // bigger radius (~50px) than the 32px I'd been drawing at, so mine never
-    // lined up with it, it just looked like an extra shape. Real fix: light up
-    // the sprite's *own* ring/dot directly by tinting its actual pixels
-    // (source-atop, on an offscreen copy so it can't bleed onto anything else
-    // already drawn to the main canvas) instead of adding new shapes around it.
-    // Bridges the gap between the dot and the ring with the same glow, so
-    // touching reads as one connected light rather than two separate glowing
-    // shapes with a dark void between them (Rob: same glow treatment "to the
-    // center dot" too, not just the outer ring).
-    const bridge = ctx.createRadialGradient(x, y, 18, x, y, 46);
-    bridge.addColorStop(0, `rgba(${rgb}, 0)`);
-    bridge.addColorStop(0.55, `rgba(${rgb}, ${0.1 + g * 0.3})`);
-    bridge.addColorStop(1, `rgba(${rgb}, 0)`);
-    ctx.fillStyle = bridge;
-    ctx.beginPath();
-    ctx.arc(x, y, 46, 0, Math.PI * 2);
-    ctx.fill();
-
     // HingeMagic — ambient growing smoke, additive blue→purple, drawn behind
-    // the ring/dot so it reads as atmosphere around the hinge rather than
-    // sitting on top of it. Real params from the source project's own
-    // "HingeMagic" particle emitter (see _updateHinge).
+    // everything so it reads as atmosphere around the hinge. Real params from
+    // the source project's own "HingeMagic" particle emitter (see _updateHinge).
     for (const p of this.hingeMagicParticles) {
       const t = p.life / p.maxLife;
       const size = 30 * t;
@@ -276,32 +247,32 @@ const Platform = {
       drawTintedParticle(ctx, images.smokeParticle, p.x, p.y, size, col, alpha, true);
     }
 
+    // Sprite drawn plain (untinted) — matches how the pole's own base sprite
+    // is left alone and only gets a separate glowing outline on top, rather
+    // than recoloring the sprite's own pixels (the source-atop tinting
+    // approach used here previously).
     if (images.hinge) {
       const s = 112;
-      _hingeTintCtx.clearRect(0, 0, s, s);
-      _hingeTintCtx.drawImage(images.hinge, 0, 0, s, s);
-      _hingeTintCtx.globalCompositeOperation = 'source-atop';
-      _hingeTintCtx.fillStyle = `rgba(${rgb}, ${0.35 + g * 0.55})`;
-      _hingeTintCtx.fillRect(0, 0, s, s);
-      _hingeTintCtx.globalCompositeOperation = 'source-over';
-      // Outer colored glow — shadowBlur applies to the tinted sprite's own
-      // opaque shape (the ring + dot), so it glows around its real edges
-      // rather than needing a second drawn shape.
-      ctx.save();
-      ctx.shadowColor = `rgba(${rgb}, 0.95)`;
-      ctx.shadowBlur = 10 + g * 14;
-      ctx.drawImage(_hingeTintCanvas, x - s / 2, y - s / 2, s, s);
-      ctx.restore();
+      ctx.drawImage(images.hinge, x - s / 2, y - s / 2, s, s);
+    }
 
-      // Inner white-hot core, layered on top at reduced opacity with a
-      // tighter blur — classic neon-tube look (a bright near-white glow right
-      // at the tube itself, with the colored glow spreading further out
-      // around it), rather than a single flat colored glow.
+    // Glowing ring outline — same stroke + two-pass shadowBlur technique as
+    // the pole. Two strokes, one on the ring's inner edge (~47) and one on its
+    // outer edge (this.hingeRingRadius, 55) — the sprite's ring is a band, not
+    // a single line, so it needs glow on both edges rather than one stroke
+    // drawn somewhere in the middle. Brightens on touch like every version of
+    // this ring has, just drawn the pole's way now.
+    for (const r of [47, this.hingeRingRadius]) {
       ctx.save();
-      ctx.globalAlpha = 0.32 + g * 0.14;
-      ctx.shadowColor = `rgba(255, 255, 255, ${0.5 + g * 0.25})`;
-      ctx.shadowBlur = 2 + g * 3;
-      ctx.drawImage(_hingeTintCanvas, x - s / 2, y - s / 2, s, s);
+      ctx.shadowColor = `rgba(${rgb}, ${0.7 + g * 0.25})`;
+      ctx.shadowBlur = 22;
+      ctx.strokeStyle = `rgba(${rgb}, ${0.5 + g * 0.4})`;
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.arc(x, y, r, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.shadowBlur = 8;
+      ctx.stroke();
       ctx.restore();
     }
 

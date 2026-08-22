@@ -885,6 +885,19 @@ deploy with a proper HTTPS cert (even a free static host), not local network exp
       one middling pass trying to do both jobs.
   48. **Pole brightness -10%** — gradient stops and shadow alpha all scaled
       down by 0.9 (0.9→0.81, 0.55→0.495, 0.95→0.855).
+  49. **Hinge ring rebuilt to match the pole's own stroke+glow technique.** Rob
+      asked to remove the sprite-tinting approach (source-atop recoloring the
+      hinge sprite's own pixels, plus the dot-to-ring bridge gradient) and
+      replace it with the pole's simpler two-pass `shadowBlur` stroke instead,
+      for visual consistency between the two. The hinge sprite is now drawn
+      plain/untinted (matches how the pole's own base sprite is left alone),
+      with a separate glowing stroked circle on top at `hingeRingRadius`.
+      Follow-up from Rob: the ring is a *band*, not a single line — added a
+      second stroke at its inner edge (47) alongside the outer one (55) so
+      both edges glow, matching how the sprite's ring actually looks.
+      `_hingeTintCanvas`/`_hingeTintCtx` removed as dead code (only
+      `_particleTintCanvas` remains, still used by `drawTintedParticle` for the
+      HingeMagic/HingeSparks emitters, which are unaffected by this change).
 
 **Dev tooling note:** hit a caching issue while verifying the fixes above — the
 Browser-pane preview tool caches by *exact URL*, harder than a normal browser (even
