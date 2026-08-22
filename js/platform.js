@@ -117,9 +117,9 @@ const Platform = {
     const speed = target > this.hingeGlow ? 1 / 0.7 : 1 / 0.3;
     this.hingeGlow += (target - this.hingeGlow) * Math.min(1, dt * speed * 3);
 
-    // HingeMagic — slow ambient smoke, always running (real params: flow 2/s,
-    // force 1-3, life 2-4s). Not tied to touch — matches its low, constant
-    // flow rate in the source, and gives the idle hinge some ambient life.
+    // HingeMagic — ambient smoke, same real params (flow 2/s, force 1-3, life
+    // 2-4s, grows to 30px) constantly regardless of touch state (Rob: undid
+    // the idle-specific tuning — keep this identical whether touching or not).
     this.hingeMagicTimer -= dt;
     if (this.hingeMagicTimer <= 0) {
       this.hingeMagicTimer = 0.5; // flow=2/s
@@ -128,7 +128,9 @@ const Platform = {
       this.hingeMagicParticles.push({
         x: this.pivot.x, y: this.pivot.y,
         vx: Math.cos(a) * force, vy: Math.sin(a) * force,
-        life: 0, maxLife: 2 + Math.random() * 2,
+        life: 0,
+        maxLife: 2 + Math.random() * 2,
+        maxSize: 30,
       });
     }
     for (const p of this.hingeMagicParticles) {
@@ -139,11 +141,10 @@ const Platform = {
     this.hingeMagicParticles = this.hingeMagicParticles.filter((p) => p.life < p.maxLife);
 
     // HingeSparks — fast radiating burst (real params: flow 60/s, force 50-90,
-    // life 0.2-1s, zoneRadius 30). Rate scales with hingeGlow — a full 60/s
-    // burst continuously even at idle would be a lot of noise, and the source
-    // project's events almost certainly gate this on contact rather than
-    // running it constantly; ramping with touch approximates that.
-    const sparkFlow = 3 + this.hingeGlow * 57;
+    // life 0.2-1s, zoneRadius 30). Constant at the full rate regardless of
+    // touch now (Rob liked how much more active it looked while touching and
+    // wants that always-on) — was ramped 3→60/s with hingeGlow before.
+    const sparkFlow = 60;
     this.hingeSparkTimer -= dt;
     if (this.hingeSparkTimer <= 0) {
       this.hingeSparkTimer = 1 / sparkFlow;
@@ -186,19 +187,22 @@ const Platform = {
       // stroke's own alpha at each point, so the glow fades along with it
       // rather than needing a separate mask.
       const fade = ctx.createLinearGradient(x, y, x, y + this.poleHeight);
-      fade.addColorStop(0, 'rgba(170, 100, 255, 0.81)'); // -10% (Rob)
-      fade.addColorStop(0.6, 'rgba(170, 100, 255, 0.495)');
+      // Darker base line than the hinge match (Rob: "the pole should be
+      // darker"), but with more glow spread than before (Rob: "both need to
+      // glow more") — darkness and glow amount are separate knobs: alpha
+      // controls the line itself, shadowBlur controls how far the glow spreads.
+      fade.addColorStop(0, 'rgba(170, 100, 255, 0.35)');
+      fade.addColorStop(0.6, 'rgba(170, 100, 255, 0.2)');
       fade.addColorStop(1, 'rgba(170, 100, 255, 0)');
       // Two passes, same neon technique as the hinge — a wide soft outer glow
-      // first, then the crisp line on top with a tighter blur. A single
-      // shadowBlur=12 pass read as barely-there (Rob: "should be glowing").
-      ctx.shadowColor = 'rgba(150, 70, 230, 0.855)';
-      ctx.shadowBlur = 22;
+      // first, then the crisp line on top with a tighter blur.
+      ctx.shadowColor = 'rgba(150, 70, 230, 0.55)';
+      ctx.shadowBlur = 34;
       ctx.strokeStyle = fade;
       ctx.lineWidth = 3;
       roundRectPath(ctx, poleX, y, poleW, this.poleHeight, 10);
       ctx.stroke();
-      ctx.shadowBlur = 8;
+      ctx.shadowBlur = 14;
       ctx.stroke();
       ctx.restore();
     }
@@ -232,21 +236,6 @@ const Platform = {
     ];
     const rgb = c.join(',');
 
-    // HingeMagic — ambient growing smoke, additive blue→purple, drawn behind
-    // everything so it reads as atmosphere around the hinge. Real params from
-    // the source project's own "HingeMagic" particle emitter (see _updateHinge).
-    for (const p of this.hingeMagicParticles) {
-      const t = p.life / p.maxLife;
-      const size = 30 * t;
-      const alpha = (150 / 255) * (1 - t);
-      const col = [
-        Math.round(74 + (119 - 74) * t),
-        Math.round(144 + (0 - 144) * t),
-        Math.round(226 + (255 - 226) * t),
-      ];
-      drawTintedParticle(ctx, images.smokeParticle, p.x, p.y, size, col, alpha, true);
-    }
-
     // Sprite drawn plain (untinted) — matches how the pole's own base sprite
     // is left alone and only gets a separate glowing outline on top, rather
     // than recoloring the sprite's own pixels (the source-atop tinting
@@ -256,24 +245,89 @@ const Platform = {
       ctx.drawImage(images.hinge, x - s / 2, y - s / 2, s, s);
     }
 
-    // Glowing ring outline — same stroke + two-pass shadowBlur technique as
-    // the pole. Two strokes, one on the ring's inner edge (~47) and one on its
-    // outer edge (this.hingeRingRadius, 55) — the sprite's ring is a band, not
-    // a single line, so it needs glow on both edges rather than one stroke
-    // drawn somewhere in the middle. Brightens on touch like every version of
-    // this ring has, just drawn the pole's way now.
+    // Same neon treatment on the center dot — a stroked outline on its edge
+    // (matching the ring's technique exactly), not a filled disk. Drawn before
+    // the ring and before the hinge bubbles now (Rob: bubbles should sit in
+    // front of the dot but behind the ring), whereas this used to be drawn
+    // after the ring.
+    const dotR = 17;
+    // Most of the glow removed here (Rob: not needed now that the stroke
+    // itself is blurred via ctx.filter) — dropped the big radial-gradient halo
+    // fill entirely and cut shadowBlur down to one modest pass instead of two
+    // large ones (110/45).
+    ctx.save();
+    ctx.filter = 'blur(4px)'; // wider/blurrier (Rob) — was 2.5px
+    // Idle raised back up a bit (Rob: idle was reading as too dull once the
+    // wide glow got dropped) — was 0.25/15, now brighter and a bit more blur
+    // at rest while touch still pops further above it.
+    ctx.shadowColor = `rgba(${rgb}, ${0.45 + g * 0.55})`;
+    ctx.shadowBlur = 20 + g * 15;
+    ctx.strokeStyle = `rgba(${rgb}, ${0.4 + g * 0.6})`;
+    ctx.lineWidth = 5; // wider (Rob) — was 3
+    ctx.beginPath();
+    ctx.arc(x, y, dotR, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
+    // Solid opaque core pass, no blur/shadow — reads as a real solid line
+    // sitting cleanly in front of whatever else is drawn behind it (the
+    // bubbles, in this case), not a translucent haze.
+    ctx.beginPath();
+    ctx.strokeStyle = `rgba(${rgb}, ${0.5 + g * 0.5})`;
+    ctx.lineWidth = 3; // wider (Rob) — was 2
+    ctx.arc(x, y, dotR, 0, Math.PI * 2);
+    ctx.stroke();
+
+    // HingeMagic — ambient growing smoke, additive blue→purple. Drawn *after*
+    // the dot now, not before — spawning right at the dot's center meant the
+    // sprite's own opaque dot fill was covering these almost entirely,
+    // especially the now-smaller idle ones (Rob: "the little blue fuzz coming
+    // out of the dot" wasn't visible). Each particle's own `maxSize` (set at
+    // spawn — 30 touching, 13 idle) replaces the old flat 30 so idle ones
+    // actually stay capped smaller instead of all sharing one size curve.
+    for (const p of this.hingeMagicParticles) {
+      const t = p.life / p.maxLife;
+      const size = p.maxSize * t;
+      const alpha = (150 / 255) * (1 - t);
+      const col = [
+        Math.round(74 + (119 - 74) * t),
+        Math.round(144 + (0 - 144) * t),
+        Math.round(226 + (255 - 226) * t),
+      ];
+      drawTintedParticle(ctx, images.smokeParticle, p.x, p.y, size, col, alpha, true);
+    }
+
+    // Hinge bubbles now drawn from inside here (used to be a separate call
+    // after Platform.drawHinge() in ui.js) specifically so they land between
+    // the dot (above) and the ring (below) in z-order.
+    HingeBubbles.draw(ctx);
+
+    // Glowing ring outline — same stroke + blurred-line technique as the dot.
+    // Two strokes, one on the ring's inner edge (~47) and one on its outer
+    // edge (this.hingeRingRadius, 55) — the sprite's ring is a band, not a
+    // single line. Most of the glow removed here too (Rob) — dropped the big
+    // radial-gradient halo fill and cut shadowBlur down to one modest pass.
     for (const r of [47, this.hingeRingRadius]) {
       ctx.save();
-      ctx.shadowColor = `rgba(${rgb}, ${0.7 + g * 0.25})`;
-      ctx.shadowBlur = 22;
-      ctx.strokeStyle = `rgba(${rgb}, ${0.5 + g * 0.4})`;
-      ctx.lineWidth = 3;
+      ctx.filter = 'blur(4px)'; // wider/blurrier (Rob) — was 2.5px, matching the dot
+      // Idle raised back up a bit (Rob: idle was reading as too dull once the
+      // wide glow got dropped) — was 0.25/15, now brighter and a bit more blur
+      // at rest while touch still pops further above it.
+      ctx.shadowColor = `rgba(${rgb}, ${0.45 + g * 0.55})`;
+      ctx.shadowBlur = 20 + g * 15;
+      ctx.strokeStyle = `rgba(${rgb}, ${0.4 + g * 0.6})`;
+      ctx.lineWidth = 5; // wider (Rob) — was 3
       ctx.beginPath();
       ctx.arc(x, y, r, 0, Math.PI * 2);
       ctx.stroke();
-      ctx.shadowBlur = 8;
-      ctx.stroke();
       ctx.restore();
+      // Solid opaque core pass on top, no blur/shadow — makes the ring read as
+      // a real solid line in front of the bubbles instead of a translucent
+      // haze (Rob: "the ring looks transparent").
+      ctx.beginPath();
+      ctx.strokeStyle = `rgba(${rgb}, ${0.5 + g * 0.5})`;
+      ctx.lineWidth = 3; // wider (Rob) — was 2
+      ctx.arc(x, y, r, 0, Math.PI * 2);
+      ctx.stroke();
     }
 
     // HingeSparks — fast radiating burst, cyan→blue, drawn on top so sparks
@@ -282,19 +336,20 @@ const Platform = {
     // params (see _updateHinge).
     for (const p of this.hingeSparkParticles) {
       const t = p.life / p.maxLife;
-      const size = 10 * (1 - t);
+      const size = 15 * (1 - t); // +50% starting size (Rob)
       const alpha = (70 / 255) * (1 - t);
+      // Starts white, fades to the same blue as before (was cyan→blue) — Rob's ask.
       const col = [
-        Math.round(74 + (0 - 74) * t),
+        Math.round(255 + (0 - 255) * t),
         Math.round(255 + (33 - 255) * t),
-        Math.round(242 + (255 - 242) * t),
+        255,
       ];
       drawTintedParticle(ctx, images.glowParticle, p.x, p.y, size, col, alpha, false);
     }
 
     // Jets are already positioned in world space (Difficulty computes them from
     // the pivot directly), so they're drawn outside the rotated block above.
-    Difficulty.drawJets(ctx);
+    Difficulty.drawJets(ctx, images);
   },
 
   // ---------- Liquid: a "2D water" column simulation ----------
@@ -317,8 +372,10 @@ const Platform = {
   liquidAmbientSpeed: 1.6,
   liquidTime: 0,
 
-  _liquidHalfLength() { return this.length / 2 - 15; },
-  _liquidHalfThickness() { return this.thickness / 2 - 9; },
+  // Padding between the liquid and the tube's own edges — reduced (Rob: too
+  // much gap) from 15/9 to 6/4.
+  _liquidHalfLength() { return this.length / 2 - 6; },
+  _liquidHalfThickness() { return this.thickness / 2 - 4; },
 
   _initLiquid() {
     const halfL = this._liquidHalfLength();
@@ -426,22 +483,27 @@ const Platform = {
     // binary threshold made whole segments pop in and out of existence as columns
     // crossed it, which read as the liquid "jumping" instead of moving smoothly.
     // Drawn as short per-segment strokes so each one can carry its own opacity.
+    // Tinted toward the liquid's own color (was flat near-white) and blended
+    // with 'screen' instead of a plain overwrite, so it reads as a soft
+    // reflection *of* the liquid rather than a separate white line sitting on
+    // top of it (Rob's ask).
+    ctx.save();
+    ctx.globalCompositeOperation = 'screen';
     const maxDepth = halfT * 2;
     for (let i = 0; i < cols.length - 1; i++) {
       const a = cols[i], b = cols[i + 1];
       const depthA = halfT - a.level, depthB = halfT - b.level;
       const depth = Math.min(depthA, depthB);
-      // Lightened toward white with a higher ceiling (was 220,250 @ 0.75) —
-      // Rob wanted the surface reflection brighter.
-      const alpha = smoothstep(0, maxDepth * 0.22, depth) * 0.9;
+      const alpha = smoothstep(0, maxDepth * 0.22, depth) * 0.45; // darker still (Rob) — was 0.9, then 0.7
       if (alpha <= 0.01) continue;
       ctx.beginPath();
       ctx.moveTo(a.x, a.level);
       ctx.lineTo(b.x, b.level);
-      ctx.strokeStyle = `rgba(255, 245, 255, ${alpha.toFixed(3)})`;
+      ctx.strokeStyle = `rgba(${lighten(tr, 150)}, ${lighten(tg, 150)}, ${lighten(tb, 150)}, ${alpha.toFixed(3)})`;
       ctx.lineWidth = 3;
       ctx.stroke();
     }
+    ctx.restore();
 
     ctx.restore();
   },

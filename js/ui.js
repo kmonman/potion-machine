@@ -34,6 +34,33 @@ function drawCenteredText(ctx, text, x, y, w, opts) {
   ctx.restore();
 }
 
+// Draws a number with every digit at a fixed pitch — a live-updating score in
+// a proportional font (each digit a different width) visibly jitters
+// left/right frame to frame as the total string width changes with whichever
+// digits currently show (Rob: "the numbers are bouncing around because of the
+// kerning"). Non-digit characters (the thousands comma) keep their own
+// natural width, matching how "tabular figures" work in real fonts.
+function drawTabularNumber(ctx, text, centerX, y, opts) {
+  ctx.save();
+  ctx.font = `${opts.size}px ${opts.font || 'PotionBody'}`;
+  ctx.fillStyle = opts.color || '#fff';
+  ctx.textBaseline = opts.baseline || 'top';
+  ctx.textAlign = 'center';
+  let digitW = 0;
+  for (let d = 0; d <= 9; d++) digitW = Math.max(digitW, ctx.measureText(String(d)).width);
+  const chars = String(text).split('');
+  const widths = chars.map((c) => (/[0-9]/.test(c) ? digitW : ctx.measureText(c).width));
+  const totalW = widths.reduce((a, b) => a + b, 0);
+  let cx = centerX - totalW / 2;
+  for (let i = 0; i < chars.length; i++) {
+    cx += widths[i] / 2;
+    ctx.fillText(chars[i], cx, y);
+    cx += widths[i] / 2;
+  }
+  ctx.restore();
+  return totalW;
+}
+
 // ---------- Home screen ----------
 const HomeScreen = {
   layout: {
@@ -176,7 +203,39 @@ const GO_BUBBLE_MASK_H = 95;
 // up and only ends when the ball falls.
 const PlayScreen = {
   homeBtn: { x: 20, y: 138, w: 100, h: 44 },
-  muteBtn: { x: 656, y: 30, w: 44, h: 44 },
+  // Bottom-right corner, matching the Home screen's own mute button placement
+  // (Rob: move it out of the top-right so the potion counter can go there).
+  muteBtn: { x: 637, y: 1186, w: 57, h: 68 },
+  // Whole pill structure (sprite + digit together, not just the digit font)
+  // scaled 15% bigger (Rob), anchored at the same top-left corner as before.
+  PILL_SCALE: 1.15,
+  scorePillBtn: { x: 20, y: 20, w: 238 * 1.15, h: 104 * 1.15 },
+  // Sized/positioned so the *ovals themselves* match — not the raw image
+  // rects, and not the images' full opaque content either (my first attempt
+  // used alpha>200 bounds, which wrongly included the bottle icon towering
+  // over Potion Counter.png's actual oval, inflating its measured height).
+  // Rob: "use the lines not the image boundaries to compare" — so this scans
+  // a flat column of each PNG, away from the bubble cluster / bottle icon,
+  // to isolate just the oval track's own pixel height:
+  //   bubblescore3.png (476x208 native): oval flat-track spans y53-153 (100px),
+  //     stable across x160-360.
+  //   Potion Counter.png (477x259 native): oval flat-track spans y57-191 (134px),
+  //     stable across x160-280.
+  // Matching rendered oval height means solving potionScale from
+  // scoreScale's own oval height, and bottom-aligning the ovals (not the
+  // image rects) means solving y from each oval's own scaled bottom offset.
+  potionCounterBtn: (() => {
+    const scoreH = 104 * 1.15, scoreNativeH = 208, scoreOvalY0 = 53, scoreOvalY1 = 153;
+    const potionNativeH = 259, potionNativeW = 477, potionOvalY0 = 57, potionOvalY1 = 191;
+    const scoreScale = scoreH / scoreNativeH;
+    const ovalH = (scoreOvalY1 - scoreOvalY0) * scoreScale; // the target oval height both pills must share
+    const potionScale = ovalH / (potionOvalY1 - potionOvalY0);
+    const h = potionScale * potionNativeH;
+    const w = h * (potionNativeW / potionNativeH); // preserve native aspect so the rounded ends stay circular
+    const scoreOvalBottom = 20 + scoreOvalY1 * scoreScale; // score pill's own oval bottom, in canvas y
+    const y = scoreOvalBottom - potionOvalY1 * potionScale; // bottom-align the ovals themselves
+    return { x: 720 - w, y, w, h };
+  })(),
   score: 0,
   elapsed: 0,
   mode: 'freeplay',
@@ -189,8 +248,16 @@ const PlayScreen = {
   // Free Play only: a charge every 1000 points, tap a blast button to spend one.
   blastCharges: 0,
   blastThreshold: 0,
-  blastLeftBtn: { x: 75, y: 950, w: 100, h: 100 },
-  blastRightBtn: { x: 545, y: 950, w: 100, h: 100 },
+  // Bigger again (Rob: the ring+bottle together were both shrinking as this
+  // whole box shrank, making the bottle too small — not that the box itself
+  // needed to be smaller). Kept centered on the same point as the original
+  // 100x100 buttons (center 125,1000 / 595,1000).
+  blastLeftBtn: { x: 45, y: 920, w: 160, h: 160 },
+  blastRightBtn: { x: 515, y: 920, w: 160, h: 160 },
+  // 0-1, eased toward 1 while the potion counter is above 0 and toward 0
+  // otherwise — drives a subtle grow+fade instead of an instant show/hide
+  // (Rob). See _drawBlastButtons.
+  blastButtonsT: 0,
 
   enter(mode) {
     this.mode = mode || this.mode;
@@ -208,6 +275,7 @@ const PlayScreen = {
     this.goBubbleTimer = 0;
     this.blastCharges = 0;
     this.blastThreshold = 0;
+    this.blastButtonsT = 0;
   },
 
   get isOver() { return Physics.fellOff || this.timedOut; },
@@ -220,6 +288,9 @@ const PlayScreen = {
       Difficulty.update(dt);
       Physics.update(dt, tiltX);
       HingeBubbles.update(dt, Physics.touchingHinge, Platform.pivot.x, Platform.pivot.y);
+      // Back to 6,000 points/minute (100/s) — the earlier 1,000/min slowdown was
+      // to make the live-updating digits readable, which is now handled by the
+      // tabular-number fix instead, so full speed is safe again (Rob).
       if (Physics.touchingHinge) this.score += 100 * dt;
       this.elapsed += dt;
       if (this.elapsed >= this.timeLimit) this.timedOut = true;
@@ -234,6 +305,11 @@ const PlayScreen = {
       if (this.leaderboardMsgT > 0) this.leaderboardMsgT = Math.max(0, this.leaderboardMsgT - dt);
       this._updateGoBubbles(dt);
     }
+
+    // Blast buttons only show once the potion counter is above 0, and ease
+    // in/out (~0.3s) rather than popping instantly (Rob).
+    const blastTarget = (this.mode === 'freeplay' && !this.isOver && this._potionsMade() > 0) ? 1 : 0;
+    this.blastButtonsT += (blastTarget - this.blastButtonsT) * Math.min(1, dt / 0.3);
   },
 
   // Score width varies (585 vs. a 5-digit "12,345"), so the bubble cluster next
@@ -308,6 +384,12 @@ const PlayScreen = {
     return 0;
   },
 
+  // Live HUD potion counter (top-right pill) — uncapped, +1 every 1,000 points,
+  // unlike _potionsFilled() above which caps at 3 for the Game Over board icons.
+  _potionsMade() {
+    return Math.floor(this.score / 1000);
+  },
+
   draw(ctx, images, sceneLabel) {
     ctx.fillStyle = COLOR.bg;
     ctx.fillRect(0, 0, 720, 1280);
@@ -323,8 +405,9 @@ const PlayScreen = {
     // both rendered on top instead of appearing to sit under/against the hinge.
     Physics.draw(ctx, images);
     Difficulty.drawMoon(ctx, images);
+    // HingeBubbles now draws from inside Platform.drawHinge() itself, between
+    // the dot and the ring, so it isn't called separately here anymore.
     Platform.drawHinge(ctx, images);
-    HingeBubbles.draw(ctx);
 
     this._drawHud(ctx, images, sceneLabel);
 
@@ -332,68 +415,117 @@ const PlayScreen = {
   },
 
   _drawHud(ctx, images, sceneLabel) {
-    // Player name + score pill — hidden once the run is over. What I originally
-    // read as a "T ·" player-name prefix in Rob's reference screenshot turned out
-    // to actually be the *fell-off icon* (Ball Off.png, a T-shaped platform +
-    // dot), not a name at all — the real Game Over screen shows no player name,
-    // just that icon and the score, both positioned inside the board itself (see
-    // _drawGameOver). Keeping the name+score pill for active gameplay, since
-    // there's no evidence either way there and it's a reasonable HUD addition.
+    // Score pill — hidden once the run is over (matches the Game Over
+    // screenshot, which shows no player name, just the fell-off icon +
+    // score inside the board itself — see _drawGameOver). Player name label
+    // removed from here per Rob (was drawn as "<name> ·" before the pill).
     if (!this.isOver) {
-      ctx.save();
-      ctx.font = '28px PotionBody';
-      ctx.fillStyle = '#fff';
-      ctx.textAlign = 'left';
-      ctx.textBaseline = 'middle';
-      const nameStr = state.playerName + ' ·';
-      ctx.fillText(nameStr, 20, 72);
-      const nameWidth = ctx.measureText(nameStr).width;
-      ctx.restore();
-
-      const pillX = 20 + nameWidth + 14;
+      const sb = this.scorePillBtn;
       if (images.bubbleScore) {
-        ctx.drawImage(images.bubbleScore, pillX, 20, 238, 104);
+        ctx.drawImage(images.bubbleScore, sb.x, sb.y, sb.w, sb.h);
       }
-      drawCenteredText(ctx, this._scoreText(), pillX + 40, 55, 170, { size: 34, font: 'PotionTitle', color: '#fff' });
+      // Digit x/y offsets and font size scaled by the same PILL_SCALE as the
+      // pill sprite itself (Rob: "not just the numbers the whole structure").
+      drawTabularNumber(ctx, this._scoreText(), sb.x + 125 * this.PILL_SCALE, sb.y + 35 * this.PILL_SCALE,
+        { size: 34 * this.PILL_SCALE, font: 'PotionTitle', color: '#9b9b9b' });
+
+      // Potion counter — top-right pill (Free Play's "Timer" instance in the
+      // source, despite the misleading name it uses Potion Counter.png).
+      // +1 every 1,000 points (Rob). Digit color matches the score pill's
+      // number (Rob's gray, #9b9b9b) for consistency between the two pills.
+      const cb = this.potionCounterBtn;
+      if (images.potionCounter) {
+        // The potion pill ends up scaled down more aggressively than the
+        // score pill relative to each PNG's own native resolution (their
+        // ovals are sized to match, but Potion Counter.png is natively
+        // taller), which shrinks its *baked-in* glow halo along with it —
+        // so at this size the glow reads much fainter than the score pill's
+        // (Rob). Reinforce it with an extra blurred, slightly oversized copy
+        // underneath rather than redrawing the border by hand.
+        ctx.save();
+        ctx.filter = 'blur(5px)';
+        ctx.globalAlpha = 0.7;
+        ctx.drawImage(images.potionCounter, cb.x - 3, cb.y - 3, cb.w + 6, cb.h + 6);
+        ctx.restore();
+        ctx.drawImage(images.potionCounter, cb.x, cb.y, cb.w, cb.h);
+      }
+      // Digit x-offset kept at the same fraction of pill width as the real
+      // source's text-vs-pill offset (82/191), so it stays put as the pill's
+      // own size changes. Y uses the oval's own vertical center (native
+      // y57-191, center 124 of 259) rather than the full image's center —
+      // the oval sits with uneven top/bottom padding in the source PNG (the
+      // bottle towers above it), so cb.h/2 landed visibly low (Rob).
+      drawTabularNumber(ctx, String(this._potionsMade()), cb.x + cb.w * (97 / 191), cb.y + cb.h * (124 / 259),
+        { size: 34 * this.PILL_SCALE, font: 'PotionTitle', color: '#9b9b9b', baseline: 'middle' });
     }
 
-    // Hidden once the run is over — matches the reference Game Over screenshot
-    // (no mode/timer text up top there). Shifted into the upper-right (was
-    // dead-center) so it no longer collides with the name+score pill, which
-    // grows wider than the old score-only pill for longer player names.
-    if (!this.isOver) {
-      drawCenteredText(ctx, sceneLabel, 400, 40, 320, { size: 22, font: 'PotionTitle', color: 'rgba(255,255,255,0.6)' });
-      drawCenteredText(ctx, this._timeText(), 400, 74, 320, { size: 26, font: 'PotionBody', color: COLOR.instructions });
-    }
-
-    // In-game mute toggle — same shared mute state as Home.
+    // In-game mute toggle — same shared mute state as Home, now moved to the
+    // bottom-right corner (Rob) to match the Home screen's own placement,
+    // vacating the top-right for the potion counter pill above.
     const muteImg = state.muted ? images.muteMuted : images.muteUnmuted;
-    drawImg(ctx, muteImg, this.muteBtn.x, this.muteBtn.y, this.muteBtn.w, this.muteBtn.h * (68 / 57));
+    drawImg(ctx, muteImg, this.muteBtn.x, this.muteBtn.y, this.muteBtn.w, this.muteBtn.h);
 
-    LevelsScreen.drawHomeButton.call({ homeBtn: this.homeBtn }, ctx);
-
-    if (this.mode === 'freeplay' && !this.isOver) this._drawBlastButtons(ctx, images);
+    if (this.mode === 'freeplay' && this.blastButtonsT > 0.001) this._drawBlastButtons(ctx, images);
   },
 
   _drawBlastButtons(ctx, images) {
+    const t = this.blastButtonsT;
     const active = this.blastCharges > 0;
+    // Subtle grow+fade tied to blastButtonsT instead of an instant pop
+    // in/out (Rob) — scale eases 85%→100% while alpha fades 0→1, each
+    // button scaling from its own center so it doesn't drift position.
+    const scale = 0.85 + 0.15 * t;
     ctx.save();
-    ctx.globalAlpha = active ? 1 : 0.35;
+    ctx.globalAlpha = (active ? 1 : 0.35) * t;
     for (const btn of [this.blastLeftBtn, this.blastRightBtn]) {
-      if (images.potionBlast) drawImg(ctx, images.potionBlast, btn.x, btn.y, btn.w, btn.h);
-      else {
-        ctx.beginPath();
-        ctx.arc(btn.x + btn.w / 2, btn.y + btn.h / 2, btn.w / 2, 0, Math.PI * 2);
-        ctx.strokeStyle = COLOR.purple;
-        ctx.lineWidth = 3;
-        ctx.stroke();
+      const cx = btn.x + btn.w / 2, cy = btn.y + btn.h / 2;
+      ctx.save();
+      ctx.translate(cx, cy);
+      ctx.scale(scale, scale);
+      ctx.translate(-cx, -cy);
+      // Ring is the real asset now (Blast.png — Rob added it to assets/,
+      // "the button is called blast") instead of a hand-drawn stroke, since
+      // my canvas-drawn gradient highlight didn't read right. It already has
+      // the glowing purple ring + top glossy reflection baked in. Measured
+      // its crisp ring band directly (rgb(121,62,249) — same color as
+      // Blast2.png's, confirming it's the matching asset): radius 267px out
+      // of the 897px-wide canvas's 448.5px half-width, ratio 0.595. Scaled
+      // so that band lands at the same ringR as before (circle smaller,
+      // bottle stays the same size — btn.w * 0.55 below, untouched).
+      const ringR = btn.w * 0.5 * 0.7;
+      if (images.blastRing) {
+        const ringDrawSize = (ringR / 0.595) * 2;
+        drawImg(ctx, images.blastRing, cx - ringDrawSize / 2, cy - ringDrawSize / 2, ringDrawSize, ringDrawSize);
       }
+
+      const bw = btn.w * 0.55, bh = bw * (176 / 144);
+      if (images.potionFilled) {
+        drawImg(ctx, images.potionFilled, cx - bw / 2, cy - bh / 2, bw, bh);
+      }
+
+      // Charge-count number pulled in tight against the bottle's own
+      // top-left corner (Rob) rather than out near the ring, so its offset
+      // is anchored to the bottle's own half-width instead of ringR.
+      const numX = cx - bw * 0.42, numY = cy - bh * 0.42;
+      const numFontSize = btn.w * 0.11 * 1.15 * 1.5;
+
+      // Small circle behind the number, colored to match the pole's own flat
+      // sprite fill (Rob) — sampled directly from NewSprite.png's center
+      // pixel: rgb(33,24,46), a dark slate-purple, not the bright ring purple.
+      ctx.beginPath();
+      ctx.arc(numX, numY, numFontSize * 0.62, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgb(33, 24, 46)';
+      ctx.fill();
+
+      ctx.font = `${numFontSize}px PotionTitle`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillStyle = '#9b9b9b';
+      ctx.fillText(String(this.blastCharges), numX, numY);
+
+      ctx.restore();
     }
     ctx.restore();
-    if (active) {
-      drawCenteredText(ctx, `x${this.blastCharges}`, this.blastLeftBtn.x, this.blastLeftBtn.y + this.blastLeftBtn.h + 6,
-        this.blastLeftBtn.w, { size: 20, font: 'PotionBody', color: '#fff' });
-    }
   },
 
   _scoreText() {
@@ -566,9 +698,7 @@ const PlayScreen = {
       return null;
     }
     if (rectContains(this.muteBtn.x, this.muteBtn.y, this.muteBtn.w, this.muteBtn.h, x, y)) return { target: 'mute' };
-    const b = this.homeBtn;
-    if (rectContains(b.x, b.y, b.w, b.h, x, y)) return { target: 'home' };
-    if (this.mode === 'freeplay') {
+    if (this.mode === 'freeplay' && this.blastButtonsT > 0.5) {
       if (rectContains(this.blastLeftBtn.x, this.blastLeftBtn.y, this.blastLeftBtn.w, this.blastLeftBtn.h, x, y)) return { target: 'blast' };
       if (rectContains(this.blastRightBtn.x, this.blastRightBtn.y, this.blastRightBtn.w, this.blastRightBtn.h, x, y)) return { target: 'blast' };
     }

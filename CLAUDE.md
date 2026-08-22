@@ -899,6 +899,150 @@ deploy with a proper HTTPS cert (even a free static host), not local network exp
       `_particleTintCanvas` remains, still used by `drawTintedParticle` for the
       HingeMagic/HingeSparks emitters, which are unaffected by this change).
 
+  50. **Hinge ring/dot switched from `shadowBlur` to a real `ctx.filter='blur(Npx)'` pass.**
+      `shadowBlur` has a practical ceiling in Canvas — pushing it from 60→110 barely
+      changed anything — because it only glows around a still-crisp original shape.
+      `ctx.filter: blur()` actually blurs the drawn stroke itself, which reads as a
+      much softer glow. Both the dot and ring now draw as a blurred stroke pass
+      (outside-only, not filled) followed by a solid opaque core stroke on top, rather
+      than one shadow-blurred fill. `HingeMagic` particles (fix #46) had to move to
+      draw *after* the dot instead of before it — they'd been getting hidden under the
+      dot's now-opaque core fill. `HingeBubbles.draw()` also moved to run from inside
+      `Platform.drawHinge()` itself (between the dot and the ring) instead of a
+      separate call in `ui.js`, for correct z-order.
+  51. **HingeSparks locked to a constant full emission rate** (was ramped 3→60/s with
+      `hingeGlow`) — Rob liked how active it looked while touching and wanted that
+      always-on, not idle-scaled. Also recolored white→blue over each particle's life
+      (was a fixed cyan→blue) and sized up 50% (10px→15px start size). A brief detour
+      tried idle-specific tuning (denser but faster-dying particles while not
+      touching) — Rob asked to undo that and just keep the touching-state look
+      constant regardless of touch state.
+  52. **Liquid surface shine blended into the liquid's own color instead of drawing
+      flat white.** Wrapped the shine stroke in
+      `ctx.globalCompositeOperation='screen'` and switched its color from flat
+      `rgba(255,245,255,a)` to the liquid's own `tr/tg/tb` lightened toward white, so
+      it reads as a soft reflection tinted by whatever's in the tube rather than a
+      white line laid on top. Darkened twice more after that per Rob's follow-ups
+      (alpha multiplier 0.9→0.7→0.45). Also trimmed the liquid's padding against the
+      tube's inner wall (`_liquidHalfLength`/`_liquidHalfThickness`, -15/-9 → -6/-4).
+  53. **Jets rebuilt from the source project's real `Plasma1`/`ImpulseJet` particle
+      data instead of a hand-guessed slow-drifting-dot version.** Same technique as
+      fix #46 (read the emitter config straight out of the GDevelop JSON): flow
+      100/s, force 300-600, fixed 0.5s life, size 80→20 shrinking, color
+      (40,80,160)→(64,0,128), additive, `LightGlow.png`. The old version (a lazy
+      2.5-5.5px sprinkle) was nowhere close — real result is a tight, fast, large
+      glowing column. Iterated down from there per Rob's feedback: particle size
+      trimmed 15% (too fuzzy), then the *base* narrowed further independent of the
+      tip (spawn size 80→60, tip still 20) for a proper taper. The two inner jet
+      mount points also moved further from the hinge (±70px → ±95px).
+  54. **Removed the in-game Home button** from the Play screen's HUD (top-left,
+      separate from the Home/Levels screens' own Home buttons, which are untouched)
+      — Rob just wanted it gone during active gameplay.
+  55. **Top HUD redesigned around a reference screenshot Rob provided** (score pill
+      left, a matching bottle+oval "potion counter" pill right, no player name, no
+      mode/timer label, mute moved to the bottom-right corner):
+      - Player name text ("`<name> ·`") removed from in front of the score pill.
+      - New potion-counter pill added top-right using the real `Potion Counter.png`
+        asset (found via a grep through the source JSON for the object using it —
+        misleadingly named "Timer" in the original project, but it's genuinely the
+        potion-count display), incrementing `floor(score/1000)`, uncapped (unlike the
+        Game Over screen's separate 3-icon `_potionsFilled()`, left untouched).
+      - Mute button moved from top-right to the bottom-right corner, matching the
+        Home screen's own mute placement (same coordinates), which also cleared the
+        top-right for the new pill.
+      - The center "Free Play"/timer label was removed outright after a couple of
+        reposition attempts kept colliding with the pills as their widths changed.
+      - Both digits recolored to the same grey (`#9b9b9b`) for visual consistency.
+      - The whole pill *structure* (sprite + digit together, not just font size)
+        scaled up 15% at Rob's request, anchored at the same top-left corner.
+  56. **Matching the two pills' oval size took three tries.** First attempt matched
+      the two source PNGs' raw image heights, scaled to preserve each one's native
+      aspect ratio — wrong, because the two images have very different amounts of
+      padding baked in, so equal image height didn't mean equal-looking ovals.
+      Second attempt measured each PNG's alpha-bounds (crisp content bounding box)
+      directly — also wrong, because that bounding box silently includes the potion
+      bottle icon, which sits taller than the oval track itself, inflating the
+      measured "oval" height. Rob: "use the lines not the image boundaries to
+      compare." Third attempt scanned a flat vertical column of each PNG, well clear
+      of the bubble cluster / bottle icon, isolating just the oval track's own pixel
+      height (bubblescore3.png: 100px @ native y53-153; Potion Counter.png: 134px @
+      native y57-191) — matching *that* height, and bottom-aligning the ovals'
+      measured bottoms (not the padded image rects), finally lined up correctly.
+      The potion-counter digit's vertical position had the same root issue — it was
+      centered on the full image's center, which sits low because of the bottle's
+      uneven padding, so it recentered on the oval's own measured center instead
+      (native y57-191, center 124 of 259).
+  57. **Score-while-touching rate: 6,000/min → 1,000/min → back to 6,000/min.**
+      Dropped to 1,000/min (100/60 per frame) early on because the live-updating
+      digits were visibly jittering; once the tabular-number fix (below) solved that
+      root cause, Rob asked to restore the original 6,000/min (100/s) pace.
+  58. **Fixed the live HUD score visibly "bouncing"** — `PotionTitle` isn't a
+      monospaced font, so each digit has a different advance width; re-centering the
+      score text every frame as digits changed shifted its pixel position frame to
+      frame. Added `drawTabularNumber()` (`ui.js`): measures the widest digit 0-9
+      once, then draws every digit centered in that fixed-width slot (non-digit
+      characters like the thousands comma keep their natural width) — the standard
+      "tabular figures" technique. Applied to the live gameplay score only (the Game
+      Over score is frozen once the run ends, so it never jittered).
+  59. **Potion Blast buttons now only show once the potion counter is above 0**
+      (previously always visible, just dimmed to 35% opacity with 0 charges), and
+      ease in/out over ~0.3s (a tracked `blastButtonsT` lerped toward 1/0 each frame,
+      driving both scale 85%→100% and alpha) instead of popping instantly. Went
+      through several size passes after that (50% bigger → smaller → bigger again,
+      each centered on the same point) before settling at 160px, per repeated
+      "smaller"/"bigger" rounds of feedback — Rob's clarifying note partway through:
+      the actual complaint was that the *bottle* was shrinking along with the ring
+      whenever the whole button box shrank, not that the box itself needed to be
+      smaller.
+  60. **Blast button visual split into two independently-sized layers.** The single
+      flattened `Blast2.png` (ring + bottle baked together) couldn't let the ring
+      grow/shrink without the bottle moving with it, which is what Rob actually
+      wanted control over. Rebuilt as a separately-drawn ring (first a hand-drawn
+      canvas glow, later swapped for the real `Blast.png` ring-only asset Rob added
+      to `assets/` — see fix #62) plus the plain bottle art (`Pink Potion Final_1.png`,
+      already loaded as `images.potionFilled`) drawn at a fixed size on top, so the
+      two can be tuned independently. The charge-count number went through a few
+      styles too — a bordered badge circle, then just the bare (50% bigger) number
+      pulled in tight against the bottle's own corner, then a small circle behind it
+      again at Rob's request — colored first to match the ring's purple, then
+      switched to the pole's own flat sprite color (`rgb(33,24,46)`, sampled directly
+      from `NewSprite.png`) per Rob's specific ask.
+  61. **Blast ring's hand-drawn glow replaced with a real asset.** A canvas-drawn
+      gradient "glossy top reflection" (a bright arc fading at both ends) didn't read
+      right — Rob asked to use a PNG instead. He added `Blast.png` (a ring-only
+      sprite with the reflection baked in) to `assets/`; measured its crisp ring band
+      directly (radius 267px of an 897px-wide canvas, same `rgb(121,62,249)` as
+      `Blast2.png`'s own ring, confirming it's the matching asset) and scaled the
+      draw so that band lands at the desired ring radius.
+  62. **Potion-counter pill's source art swapped.** Rob wanted to try a different
+      export of the pill art. First attempt (`Potion Counter-100.jpg`) turned out to
+      be a JPG with a solid white background baked in — JPGs can't carry
+      transparency, so using it as-is would've shown a white box around the pill
+      instead of blending into the dark background; flagged this back to Rob rather
+      than silently faking a chroma-key. He supplied a proper transparent PNG
+      instead (`Potion Counter-8.png`); re-measured its oval bounds the same way as
+      fix #56 rather than assuming, found them pixel-identical to the old asset
+      (same 477×259 canvas, same y57-191 oval), so the existing size/alignment math
+      needed no changes — just the `ASSET_PATHS.potionCounter` path swap.
+  63. **Jet base/"nozzle" glow, several rounds.** Rob wanted the jets to look like
+      they're emerging from the glass rather than floating disconnected above it,
+      pointing at a reference image (a bright blob right where a beam meets a
+      surface). First version (a large radial blob + a stretched white "reflection"
+      streak) was way too much per Rob's feedback. Cut down to a small plain blue
+      glow — which turned out to be positioned at the *center* of the tube's
+      thickness rather than its top surface, because the `+25` offset used to
+      re-derive the surface position from the particle spawn point (which already
+      sits ~25px above the pivot line, matching half the tube's 52px thickness) was
+      pushing it back down instead of leaving it at the surface. Removed that
+      offset. Rob then asked for something more creative, referencing how real game
+      particle emitters/nozzles are typically built — layered it like the standard
+      "core flash + lingering glow + spark debris" VFX pattern (soft aura + a bright
+      white core + a thin pulsing shockwave ring + a small upward fan of spark rays,
+      animated off `PlayScreen.elapsed`) instead of one static shape. Final
+      follow-up: the crisp rays/ring read too sharp against the rest of the game's
+      soft neon look, so the whole group now draws through a `ctx.filter='blur(3px)'`
+      pass.
+
 **Dev tooling note:** hit a caching issue while verifying the fixes above — the
 Browser-pane preview tool caches by *exact URL*, harder than a normal browser (even
 `location.reload(true)` didn't bust it; only navigating to a URL with a new query

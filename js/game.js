@@ -17,8 +17,10 @@ const ASSET_PATHS = {
   motionButton: 'assets/MotionButton.png',
   muteUnmuted: 'assets/Mute P.png',
   muteMuted: 'assets/Mute P1.png',
+  potionCounter: 'assets/Potion Counter-8.png',
   glowParticle: 'assets/Glow.png',
   smokeParticle: 'assets/DarkMagicSmoke.png',
+  jetParticle: 'assets/LightGlow.png',
   pole: 'assets/NewSprite.png',
   platform: 'assets/Tube4.png',
   hinge: 'assets/Hinge.png',
@@ -42,6 +44,7 @@ const ASSET_PATHS = {
   fogFront: 'assets/FogFront3.png',
   fogFrontFlip: 'assets/FogFront3Flip.png',
   potionBlast: 'assets/Blast2.png',
+  blastRing: 'assets/Blast.png',
   // Game Over's row of 3 round buttons — one combined pill image (icons + dividers
   // baked in, tap zones split into thirds) rather than 3 separate button sprites.
   // Two variants matching the original: Free Play's 3rd icon is a leaderboard

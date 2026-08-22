@@ -59,8 +59,8 @@ const MOON_STAGE_PARAMS = {
 const JET_DEFS = [
   { activeDistance: -215 },
   { activeDistance: 215 },
-  { activeDistance: -70 },
-  { activeDistance: 70 },
+  { activeDistance: -95 },
+  { activeDistance: 95 },
 ];
 const JET_PARKED_DISTANCE = 5000;
 // Tuned down twice now — first pass (-700, 0.4s cooldown) was too strong and could
@@ -167,21 +167,25 @@ const Difficulty = {
         }
         jet.wasInRange = inRange;
 
-        // Continuous rising plume while the jet vents — the intro art shows a
-        // tall blue upward spike, but the jet previously only had a static glow
-        // with no motion at all. This spawns a steady stream of small particles
-        // that drift upward and fade, independent of whether the ball is there.
+        // Real params, straight from the source project's own "Plasma1"
+        // particle emitter (the object the ImpulseJet behavior is actually
+        // attached to): flow 100/s, force 300-600 (fast!), life fixed 0.5s,
+        // size 80→20 (shrinks), color (40,80,160)→(64,0,128), alpha 1→0,
+        // additive, zoneRadius 4, texture LightGlow.png. My hand-guessed
+        // version (slow drifting 2.5-5.5px dots) was nowhere close — this is a
+        // tight, fast, large glowing column, not a lazy sprinkle.
         jet.spawnTimer -= dt;
         if (jet.spawnTimer <= 0) {
-          jet.spawnTimer = 0.025;
+          jet.spawnTimer = 0.01; // flow=100/s
+          const spread = (Math.random() - 0.5) * (2 * Math.PI / 180); // ~1° angle spread
+          const force = 300 + Math.random() * 300;
           jet.particles.push({
-            x: jet.x + (Math.random() - 0.5) * 6,
+            x: jet.x + (Math.random() - 0.5) * 4, // zoneRadius=4
             y: jet.y,
-            vy: -(160 + Math.random() * 100),
-            drift: (Math.random() - 0.5) * 40,
-            r: 2.5 + Math.random() * 3,
-            life: 1,
-            maxLife: 1,
+            vx: Math.sin(spread) * force,
+            vy: -Math.cos(spread) * force,
+            life: 0,
+            maxLife: 0.5,
           });
         }
       } else {
@@ -189,33 +193,89 @@ const Difficulty = {
       }
 
       for (const p of jet.particles) {
+        p.x += p.vx * dt;
         p.y += p.vy * dt;
-        p.x += p.drift * dt;
-        p.life -= dt;
+        p.life += dt;
       }
-      jet.particles = jet.particles.filter((p) => p.life > 0);
+      jet.particles = jet.particles.filter((p) => p.life < p.maxLife);
     }
   },
 
-  drawJets(ctx) {
+  drawJets(ctx, images) {
     for (const jet of this.jets) {
-      if (jet.active) {
-        const grad = ctx.createRadialGradient(jet.x, jet.y, 0, jet.x, jet.y, 22);
-        grad.addColorStop(0, 'rgba(200, 160, 255, 0.85)');
-        grad.addColorStop(1, 'rgba(200, 160, 255, 0)');
-        ctx.fillStyle = grad;
-        ctx.beginPath();
-        ctx.arc(jet.x, jet.y, 22, 0, Math.PI * 2);
-        ctx.fill();
-      }
-      // Rising plume particles (see _updateJets) — drawn even after the jet
-      // switches off so the last few puffs finish rising instead of vanishing.
+      // Rising plasma column (see _updateJets) — drawn even after the jet
+      // switches off so the last puffs finish rising instead of vanishing.
+      // Real source colors/sizes: starts large (80px) and opaque, shrinks to
+      // 20px and fades to nothing over its fixed 0.5s life, additive blend,
+      // blue (40,80,160) fading toward purple (64,0,128).
       for (const p of jet.particles) {
-        const t = Math.max(0, p.life / p.maxLife);
+        const t = p.life / p.maxLife;
+        const size = (60 + (20 - 60) * t) * 0.85; // -15% (Rob: too fuzzy), base narrowed (Rob: skinnier at the base)
+        const alpha = 1 - t;
+        const col = [
+          Math.round(40 + (64 - 40) * t),
+          Math.round(80 + (0 - 80) * t),
+          Math.round(160 + (128 - 160) * t),
+        ];
+        drawTintedParticle(ctx, images.jetParticle, p.x, p.y, size, col, alpha, true);
+      }
+
+      // Nozzle/vent effect at the base, right at the tube's top surface
+      // (Rob: fixed — jet.y is already the top surface, ~25px above the
+      // pivot centerline that +25 was wrongly pulling it back down to; and
+      // "be creative, look at how real emitters do it" — layered like a
+      // typical game VFX nozzle: soft lingering aura + a bright core flash +
+      // a thin pulsing shockwave ring + a small upward fan of spark rays,
+      // rather than one flat blob). PlayScreen.elapsed drives the pulse/
+      // rotation so it isn't static.
+      if (jet.active) {
+        const bx = jet.x, by = jet.y;
+        const t = PlayScreen.elapsed;
+        const pulse = 0.5 + 0.5 * Math.sin(t * 6);
+        ctx.save();
+        ctx.globalCompositeOperation = 'lighter';
+        // Softened — the crisp rays/ring read too sharp and mechanical
+        // against the rest of the game's blurry neon look (Rob).
+        ctx.filter = 'blur(3px)';
+
+        const aura = ctx.createRadialGradient(bx, by, 0, bx, by, 24);
+        aura.addColorStop(0, 'rgba(120, 170, 255, 0.35)');
+        aura.addColorStop(1, 'rgba(90, 140, 255, 0)');
+        ctx.fillStyle = aura;
         ctx.beginPath();
-        ctx.arc(p.x, p.y, p.r * (0.5 + t * 0.5), 0, Math.PI * 2);
-        ctx.fillStyle = `rgba(150, 210, 255, ${0.75 * t})`;
+        ctx.arc(bx, by, 24, 0, Math.PI * 2);
         ctx.fill();
+
+        ctx.strokeStyle = `rgba(180, 210, 255, ${0.5 * (1 - pulse)})`;
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.arc(bx, by, 5 + pulse * 9, 0, Math.PI * 2);
+        ctx.stroke();
+
+        const angleCenter = -Math.PI / 2;
+        const spread = 0.9;
+        const rayCount = 5;
+        ctx.strokeStyle = 'rgba(200, 220, 255, 0.5)';
+        ctx.lineWidth = 1;
+        for (let i = 0; i < rayCount; i++) {
+          const a = angleCenter - spread + (2 * spread) * (i / (rayCount - 1)) + Math.sin(t * 2 + i) * 0.05;
+          const len = 9 + pulse * 4;
+          ctx.beginPath();
+          ctx.moveTo(bx + Math.cos(a) * 3, by + Math.sin(a) * 3);
+          ctx.lineTo(bx + Math.cos(a) * len, by + Math.sin(a) * len);
+          ctx.stroke();
+        }
+
+        const core = ctx.createRadialGradient(bx, by, 0, bx, by, 6);
+        core.addColorStop(0, 'rgba(255, 255, 255, 0.95)');
+        core.addColorStop(0.5, 'rgba(180, 210, 255, 0.6)');
+        core.addColorStop(1, 'rgba(180, 210, 255, 0)');
+        ctx.fillStyle = core;
+        ctx.beginPath();
+        ctx.arc(bx, by, 6, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.restore();
       }
     }
   },
