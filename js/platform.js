@@ -388,7 +388,32 @@ const Platform = {
     this.liquidTime = 0;
   },
 
+  // Runs the liquid sim in fixed ~1/60s substeps instead of one shot at
+  // whatever `dt` the frame happened to be (Rob: "the fluid is going haywire
+  // on mobile"). The spread pass already had a cap for exactly this reason
+  // (see below) after an earlier desktop-only version of this bug blew up
+  // numerically at large dt — but the *spring* integration was still running
+  // at the raw per-frame `steps`, and mobile browsers regularly deliver much
+  // larger/less consistent per-frame dt than the desktop preview (background
+  // tab throttling, slower devices, general timing jitter), which reads as
+  // visibly jumpy/unstable motion even where the hard clamps kept it from
+  // fully exploding. Substepping means every individual update always runs
+  // at the same small, known-stable dt this whole simulation was tuned at,
+  // regardless of how choppy the real frame timing is.
   _updateLiquid(dt) {
+    const maxStepDt = 1 / 60;
+    const maxSubsteps = 6; // safety cap so a huge stall can't spin this in a loop
+    let remaining = Math.min(dt, 0.1);
+    let substeps = 0;
+    while (remaining > 0 && substeps < maxSubsteps) {
+      const stepDt = Math.min(remaining, maxStepDt);
+      this._stepLiquid(stepDt);
+      remaining -= stepDt;
+      substeps++;
+    }
+  },
+
+  _stepLiquid(dt) {
     const steps = dt * 60; // constants tuned per-frame at ~60fps, like the physics elsewhere
     const halfT = this._liquidHalfThickness();
     const tanA = Math.tan(this.angleRad);

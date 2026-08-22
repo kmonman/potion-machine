@@ -27,7 +27,10 @@ const Physics = {
   fellOff: false,
 
   reset() {
-    this.x = Platform.pivot.x + 120;
+    // Drop from the center of the screen (Rob) — Platform.pivot.x is already
+    // screen-center (360 of 720), so this just drops the old +120 offset to
+    // one side instead of picking a new coordinate.
+    this.x = Platform.pivot.x;
     this.y = Platform.pivot.y - 140;
     this.vx = 0;
     this.vy = 0;
