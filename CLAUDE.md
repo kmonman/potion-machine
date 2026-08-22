@@ -883,6 +883,8 @@ deploy with a proper HTTPS cert (even a free static host), not local network exp
       well on the hinge: a wide soft glow first (`shadowBlur=22`), then the
       crisp line again on top with a tighter blur (`shadowBlur=8`), rather than
       one middling pass trying to do both jobs.
+  48. **Pole brightness -10%** — gradient stops and shadow alpha all scaled
+      down by 0.9 (0.9→0.81, 0.55→0.495, 0.95→0.855).
 
 **Dev tooling note:** hit a caching issue while verifying the fixes above — the
 Browser-pane preview tool caches by *exact URL*, harder than a normal browser (even

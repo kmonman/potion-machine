@@ -193,13 +193,13 @@ const Platform = {
       // stroke's own alpha at each point, so the glow fades along with it
       // rather than needing a separate mask.
       const fade = ctx.createLinearGradient(x, y, x, y + this.poleHeight);
-      fade.addColorStop(0, 'rgba(170, 100, 255, 0.9)');
-      fade.addColorStop(0.6, 'rgba(170, 100, 255, 0.55)');
+      fade.addColorStop(0, 'rgba(170, 100, 255, 0.81)'); // -10% (Rob)
+      fade.addColorStop(0.6, 'rgba(170, 100, 255, 0.495)');
       fade.addColorStop(1, 'rgba(170, 100, 255, 0)');
       // Two passes, same neon technique as the hinge — a wide soft outer glow
       // first, then the crisp line on top with a tighter blur. A single
       // shadowBlur=12 pass read as barely-there (Rob: "should be glowing").
-      ctx.shadowColor = 'rgba(150, 70, 230, 0.95)';
+      ctx.shadowColor = 'rgba(150, 70, 230, 0.855)';
       ctx.shadowBlur = 22;
       ctx.strokeStyle = fade;
       ctx.lineWidth = 3;
