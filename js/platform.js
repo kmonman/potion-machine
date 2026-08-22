@@ -196,11 +196,16 @@ const Platform = {
       fade.addColorStop(0, 'rgba(170, 100, 255, 0.9)');
       fade.addColorStop(0.6, 'rgba(170, 100, 255, 0.55)');
       fade.addColorStop(1, 'rgba(170, 100, 255, 0)');
-      ctx.shadowColor = 'rgba(150, 70, 230, 0.9)';
-      ctx.shadowBlur = 12;
+      // Two passes, same neon technique as the hinge — a wide soft outer glow
+      // first, then the crisp line on top with a tighter blur. A single
+      // shadowBlur=12 pass read as barely-there (Rob: "should be glowing").
+      ctx.shadowColor = 'rgba(150, 70, 230, 0.95)';
+      ctx.shadowBlur = 22;
       ctx.strokeStyle = fade;
       ctx.lineWidth = 3;
       roundRectPath(ctx, poleX, y, poleW, this.poleHeight, 10);
+      ctx.stroke();
+      ctx.shadowBlur = 8;
       ctx.stroke();
       ctx.restore();
     }

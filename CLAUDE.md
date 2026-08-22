@@ -878,6 +878,11 @@ deploy with a proper HTTPS cert (even a free static host), not local network exp
       `drawTintedParticle`), reused via a small 40x40 scratch canvas. Also
       removed the old hand-rolled `sparkles` burst entirely — replaced outright
       by the real `HingeSparks` system rather than kept alongside it.
+  47. **Pole outline barely glowed** — a single `shadowBlur=12` pass read as
+      almost flat. Switched to the same two-pass technique already working
+      well on the hinge: a wide soft glow first (`shadowBlur=22`), then the
+      crisp line again on top with a tighter blur (`shadowBlur=8`), rather than
+      one middling pass trying to do both jobs.
 
 **Dev tooling note:** hit a caching issue while verifying the fixes above — the
 Browser-pane preview tool caches by *exact URL*, harder than a normal browser (even
