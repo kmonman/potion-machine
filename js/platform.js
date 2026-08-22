@@ -120,9 +120,21 @@ const Platform = {
   draw(ctx, images) {
     const { x, y } = this.pivot;
 
-    // Pole (static, drawn from the pivot straight down).
+    // Pole (static, drawn from the pivot straight down), with a glowing purple
+    // outline — Rob pointed at another one of his games where the post has
+    // this treatment; the base sprite (NewSprite.png) is just a flat dark bar
+    // with no glow of its own.
     if (images.pole) {
-      ctx.drawImage(images.pole, x - 25, y, 50, this.poleHeight);
+      const poleW = 50, poleX = x - poleW / 2;
+      ctx.drawImage(images.pole, poleX, y, poleW, this.poleHeight);
+      ctx.save();
+      ctx.shadowColor = 'rgba(150, 70, 230, 0.9)';
+      ctx.shadowBlur = 12;
+      ctx.strokeStyle = 'rgba(170, 100, 255, 0.85)';
+      ctx.lineWidth = 3;
+      roundRectPath(ctx, poleX, y, poleW, this.poleHeight, 10);
+      ctx.stroke();
+      ctx.restore();
     }
 
     // Platform bar, rotated around the pivot.

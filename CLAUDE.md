@@ -845,6 +845,12 @@ deploy with a proper HTTPS cert (even a free static host), not local network exp
       light rather than two separate glowing shapes with a dark void between
       them — Rob wanted the same glow treatment extended to the dot, not just
       the outer ring.
+  44. **Pole had no glow — added a purple outline**, matching a style Rob
+      pointed at from another one of his own games. The base sprite
+      (`NewSprite.png`) is just a flat dark bar; added a stroked, glowing
+      rounded-rect outline (`roundRectPath`, `shadowBlur`) around it in
+      `Platform.draw()`, constant (not tied to `hingeGlow`) since the reference
+      shows it always lit, not reacting to touch.
 
 **Dev tooling note:** hit a caching issue while verifying the fixes above — the
 Browser-pane preview tool caches by *exact URL*, harder than a normal browser (even
