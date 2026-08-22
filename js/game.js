@@ -17,6 +17,8 @@ const ASSET_PATHS = {
   motionButton: 'assets/MotionButton.png',
   muteUnmuted: 'assets/Mute P.png',
   muteMuted: 'assets/Mute P1.png',
+  glowParticle: 'assets/Glow.png',
+  smokeParticle: 'assets/DarkMagicSmoke.png',
   pole: 'assets/NewSprite.png',
   platform: 'assets/Tube4.png',
   hinge: 'assets/Hinge.png',

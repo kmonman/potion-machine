@@ -16,6 +16,29 @@ _hingeTintCanvas.width = 112;
 _hingeTintCanvas.height = 112;
 const _hingeTintCtx = _hingeTintCanvas.getContext('2d');
 
+// Same trick, reused per-particle for the hinge's magic-smoke/spark emitters
+// (see drawHinge) — small enough to redraw every particle every frame cheaply.
+const _particleTintCanvas = document.createElement('canvas');
+_particleTintCanvas.width = 40;
+_particleTintCanvas.height = 40;
+const _particleTintCtx = _particleTintCanvas.getContext('2d');
+
+function drawTintedParticle(ctx, img, px, py, size, color, alpha, additive) {
+  if (!img || size <= 0.5 || alpha <= 0.01) return;
+  const s = Math.min(40, Math.max(1, Math.ceil(size)));
+  _particleTintCtx.clearRect(0, 0, 40, 40);
+  _particleTintCtx.drawImage(img, 0, 0, s, s);
+  _particleTintCtx.globalCompositeOperation = 'source-atop';
+  _particleTintCtx.fillStyle = `rgb(${color[0]}, ${color[1]}, ${color[2]})`;
+  _particleTintCtx.fillRect(0, 0, s, s);
+  _particleTintCtx.globalCompositeOperation = 'source-over';
+  ctx.save();
+  ctx.globalAlpha = Math.min(1, alpha);
+  ctx.globalCompositeOperation = additive ? 'lighter' : 'source-over';
+  ctx.drawImage(_particleTintCanvas, 0, 0, s, s, px - size / 2, py - size / 2, size, size);
+  ctx.restore();
+}
+
 const Platform = {
   pivot: { x: 360, y: 652 },
   // Shortened from the original's 674 (Rob's phone test: the tube reached close
@@ -43,17 +66,23 @@ const Platform = {
   timer: 0,
   direction: 1,
 
-  // Hinge glow + sparkle burst while the ball is touching it. Rob's real
-  // reference screenshots (a "not touching" and a "touching" shot of the actual
-  // original game) showed this port's version was backwards (dimmer while
-  // touched — an earlier, unverified guess) and too flat at idle. Several
-  // follow-up misses trying to add texture between the core and outer ring
-  // (rotating dots, a tick-mark reticle, twinkling dust) all ended up reading
-  // as some kind of stray white blob once tuned — dropped that idea entirely
-  // for now; just the ring and the sprite's own center dot, both reacting to
-  // touch.
+  // Hinge glow + emitters + sparkle burst while the ball is touching it. Rob's
+  // real reference screenshots (a "not touching" and a "touching" shot of the
+  // actual original game) showed this port's version was backwards (dimmer
+  // while touched — an earlier, unverified guess) and too flat at idle.
+  // Several follow-up misses trying to add texture between the core and outer
+  // ring (rotating dots, a tick-mark reticle, twinkling dust) all ended up
+  // reading as some kind of stray white blob once tuned. The real fix: the
+  // source project's own JSON has two actual particle-emitter definitions tied
+  // to the hinge — "HingeMagic" (slow ambient smoke, additive, blue→purple,
+  // grows 0→30px over 2-4s, flow 2/s) and "HingeSparks" (fast radiating burst,
+  // cyan→blue, shrinks 10→0px, lives 0.2-1s, force 50-90, flow 60/s) — read
+  // directly from the project file's own numbers rather than guessed.
   hingeGlow: 0, // 0 = idle, 1 = touched — brighter/warmer at 1, not dimmer
-  sparkles: [],
+  hingeMagicParticles: [],
+  hingeMagicTimer: 0,
+  hingeSparkParticles: [],
+  hingeSparkTimer: 0,
 
   reset() {
     this.angle = 0;
@@ -63,7 +92,10 @@ const Platform = {
     this.tweenElapsed = 0;
     this.timer = 0;
     this.hingeGlow = 0;
-    this.sparkles = [];
+    this.hingeMagicParticles = [];
+    this.hingeMagicTimer = 0;
+    this.hingeSparkParticles = [];
+    this.hingeSparkTimer = 0;
     this._initLiquid();
   },
 
@@ -92,23 +124,51 @@ const Platform = {
     const speed = target > this.hingeGlow ? 1 / 0.7 : 1 / 0.3;
     this.hingeGlow += (target - this.hingeGlow) * Math.min(1, dt * speed * 3);
 
-    if (Physics.touchingHinge) {
-      for (let i = 0; i < 2; i++) {
-        const angle = Math.random() * Math.PI * 2;
-        this.sparkles.push({
-          x: this.pivot.x, y: this.pivot.y,
-          vx: Math.cos(angle) * 60, vy: Math.sin(angle) * 60 - 30,
-          life: 0.5, maxLife: 0.5,
-        });
-      }
+    // HingeMagic — slow ambient smoke, always running (real params: flow 2/s,
+    // force 1-3, life 2-4s). Not tied to touch — matches its low, constant
+    // flow rate in the source, and gives the idle hinge some ambient life.
+    this.hingeMagicTimer -= dt;
+    if (this.hingeMagicTimer <= 0) {
+      this.hingeMagicTimer = 0.5; // flow=2/s
+      const a = Math.random() * Math.PI * 2;
+      const force = 1 + Math.random() * 2;
+      this.hingeMagicParticles.push({
+        x: this.pivot.x, y: this.pivot.y,
+        vx: Math.cos(a) * force, vy: Math.sin(a) * force,
+        life: 0, maxLife: 2 + Math.random() * 2,
+      });
     }
-    for (const s of this.sparkles) {
-      s.x += s.vx * dt;
-      s.y += s.vy * dt;
-      s.vy += 80 * dt;
-      s.life -= dt;
+    for (const p of this.hingeMagicParticles) {
+      p.x += p.vx * dt;
+      p.y += p.vy * dt;
+      p.life += dt;
     }
-    this.sparkles = this.sparkles.filter((s) => s.life > 0);
+    this.hingeMagicParticles = this.hingeMagicParticles.filter((p) => p.life < p.maxLife);
+
+    // HingeSparks — fast radiating burst (real params: flow 60/s, force 50-90,
+    // life 0.2-1s, zoneRadius 30). Rate scales with hingeGlow — a full 60/s
+    // burst continuously even at idle would be a lot of noise, and the source
+    // project's events almost certainly gate this on contact rather than
+    // running it constantly; ramping with touch approximates that.
+    const sparkFlow = 3 + this.hingeGlow * 57;
+    this.hingeSparkTimer -= dt;
+    if (this.hingeSparkTimer <= 0) {
+      this.hingeSparkTimer = 1 / sparkFlow;
+      const a = Math.random() * Math.PI * 2;
+      const spawnR = Math.random() * 30;
+      const force = 50 + Math.random() * 40;
+      this.hingeSparkParticles.push({
+        x: this.pivot.x + Math.cos(a) * spawnR, y: this.pivot.y + Math.sin(a) * spawnR,
+        vx: Math.cos(a) * force, vy: Math.sin(a) * force,
+        life: 0, maxLife: 0.2 + Math.random() * 0.8,
+      });
+    }
+    for (const p of this.hingeSparkParticles) {
+      p.x += p.vx * dt;
+      p.y += p.vy * dt;
+      p.life += dt;
+    }
+    this.hingeSparkParticles = this.hingeSparkParticles.filter((p) => p.life < p.maxLife);
   },
 
   get angleRad() { return this.angle * Math.PI / 180; },
@@ -195,6 +255,22 @@ const Platform = {
     ctx.arc(x, y, 46, 0, Math.PI * 2);
     ctx.fill();
 
+    // HingeMagic — ambient growing smoke, additive blue→purple, drawn behind
+    // the ring/dot so it reads as atmosphere around the hinge rather than
+    // sitting on top of it. Real params from the source project's own
+    // "HingeMagic" particle emitter (see _updateHinge).
+    for (const p of this.hingeMagicParticles) {
+      const t = p.life / p.maxLife;
+      const size = 30 * t;
+      const alpha = (150 / 255) * (1 - t);
+      const col = [
+        Math.round(74 + (119 - 74) * t),
+        Math.round(144 + (0 - 144) * t),
+        Math.round(226 + (255 - 226) * t),
+      ];
+      drawTintedParticle(ctx, images.smokeParticle, p.x, p.y, size, col, alpha, true);
+    }
+
     if (images.hinge) {
       const s = 112;
       _hingeTintCtx.clearRect(0, 0, s, s);
@@ -224,21 +300,25 @@ const Platform = {
       ctx.restore();
     }
 
-    this._drawSparkles(ctx);
+    // HingeSparks — fast radiating burst, cyan→blue, drawn on top so sparks
+    // visibly fly outward over the ring. Replaces the old hand-guessed
+    // "sparkles" burst with the source project's real "HingeSparks" emitter
+    // params (see _updateHinge).
+    for (const p of this.hingeSparkParticles) {
+      const t = p.life / p.maxLife;
+      const size = 10 * (1 - t);
+      const alpha = (70 / 255) * (1 - t);
+      const col = [
+        Math.round(74 + (0 - 74) * t),
+        Math.round(255 + (33 - 255) * t),
+        Math.round(242 + (255 - 242) * t),
+      ];
+      drawTintedParticle(ctx, images.glowParticle, p.x, p.y, size, col, alpha, false);
+    }
 
     // Jets are already positioned in world space (Difficulty computes them from
     // the pivot directly), so they're drawn outside the rotated block above.
     Difficulty.drawJets(ctx);
-  },
-
-  _drawSparkles(ctx) {
-    for (const s of this.sparkles) {
-      const t = s.life / s.maxLife;
-      ctx.beginPath();
-      ctx.arc(s.x, s.y, 3 * t, 0, Math.PI * 2);
-      ctx.fillStyle = `rgba(220, 190, 255, ${t})`;
-      ctx.fill();
-    }
   },
 
   // ---------- Liquid: a "2D water" column simulation ----------

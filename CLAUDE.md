@@ -856,6 +856,28 @@ deploy with a proper HTTPS cert (even a free static host), not local network exp
       running the pole's height (full opacity near the hinge → transparent at
       the bottom). `shadowBlur` reads the stroke's own alpha at each point, so
       the glow itself fades along with the line — no separate mask needed.
+  46. **Rebuilt the hinge's ambient effects using the source project's own real
+      particle-emitter data**, instead of more hand-guessed circles. Rob asked
+      whether GDevelop's emitter settings would help if he sent them — turned
+      out I could just read them directly out of the project JSON myself
+      (GDevelop stores full particle configs — flow rate, particle
+      lifetime/size-over-time, color gradients, blend mode — inline). Found two
+      real emitters tied to the hinge: `HingeMagic` (ambient smoke: flow 2/s,
+      particles grow 0→30px over 2-4s, additive blend, blue→purple,
+      `DarkMagicSmoke.png`) and `HingeSparks` (fast burst: flow 60/s, force
+      50-90 outward within a 30px zone, shrink 10→0px, live 0.2-1s, cyan→blue,
+      `Glow.png`). Ported both textures and rebuilt around these exact values —
+      HingeMagic runs constantly (matches its real always-on low flow, and
+      gives the idle hinge some ambient life); HingeSparks' emission rate is
+      ramped by `hingeGlow` rather than run at a constant 60/s, since a
+      continuous full-force burst even at idle seemed like more noise than the
+      source project likely intended (its actual trigger condition lives in
+      GDevelop's event sheet, which isn't visible in the object data itself).
+      Textures are tinted per-particle via the same offscreen-canvas
+      `source-atop` trick as the hinge sprite itself (new shared helper
+      `drawTintedParticle`), reused via a small 40x40 scratch canvas. Also
+      removed the old hand-rolled `sparkles` burst entirely — replaced outright
+      by the real `HingeSparks` system rather than kept alongside it.
 
 **Dev tooling note:** hit a caching issue while verifying the fixes above — the
 Browser-pane preview tool caches by *exact URL*, harder than a normal browser (even
