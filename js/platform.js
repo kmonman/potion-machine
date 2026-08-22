@@ -128,9 +128,17 @@ const Platform = {
       const poleW = 50, poleX = x - poleW / 2;
       ctx.drawImage(images.pole, poleX, y, poleW, this.poleHeight);
       ctx.save();
+      // Gradient stroke — fades out toward the bottom of the pole instead of a
+      // uniform line the whole way down (Rob's ask). shadowBlur reads the
+      // stroke's own alpha at each point, so the glow fades along with it
+      // rather than needing a separate mask.
+      const fade = ctx.createLinearGradient(x, y, x, y + this.poleHeight);
+      fade.addColorStop(0, 'rgba(170, 100, 255, 0.9)');
+      fade.addColorStop(0.6, 'rgba(170, 100, 255, 0.55)');
+      fade.addColorStop(1, 'rgba(170, 100, 255, 0)');
       ctx.shadowColor = 'rgba(150, 70, 230, 0.9)';
       ctx.shadowBlur = 12;
-      ctx.strokeStyle = 'rgba(170, 100, 255, 0.85)';
+      ctx.strokeStyle = fade;
       ctx.lineWidth = 3;
       roundRectPath(ctx, poleX, y, poleW, this.poleHeight, 10);
       ctx.stroke();

@@ -851,6 +851,11 @@ deploy with a proper HTTPS cert (even a free static host), not local network exp
       rounded-rect outline (`roundRectPath`, `shadowBlur`) around it in
       `Platform.draw()`, constant (not tied to `hingeGlow`) since the reference
       shows it always lit, not reacting to touch.
+  45. **Pole glow now fades toward the bottom** instead of a uniform line —
+      `strokeStyle` switched from a flat color to a `createLinearGradient`
+      running the pole's height (full opacity near the hinge → transparent at
+      the bottom). `shadowBlur` reads the stroke's own alpha at each point, so
+      the glow itself fades along with the line — no separate mask needed.
 
 **Dev tooling note:** hit a caching issue while verifying the fixes above — the
 Browser-pane preview tool caches by *exact URL*, harder than a normal browser (even
