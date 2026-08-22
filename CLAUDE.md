@@ -1043,6 +1043,126 @@ deploy with a proper HTTPS cert (even a free static host), not local network exp
       soft neon look, so the whole group now draws through a `ctx.filter='blur(3px)'`
       pass.
 
+  64. **Ball dropping off-center, and a real mobile-only stability bug in the
+      liquid.** Two Rob reports:
+      - The ball always spawned at `Platform.pivot.x + 120` (a leftover offset
+        to one side); changed `Physics.reset()` to spawn at `Platform.pivot.x`
+        directly, which is already screen-center (360 of 720) — so it now
+        drops from the middle every time instead of off to one side.
+      - "The fluid is going haywire on mobile." The liquid's spring simulation
+        (`Platform._updateLiquid`) ran its integration at whatever `dt` a
+        frame happened to deliver. An earlier session had already found and
+        partially fixed a related numerical-instability bug (see Stage 2 fix
+        #7) by capping just the *spread pass's* step size — but the main
+        spring integration above it was still running at the raw per-frame
+        `steps`, and mobile browsers routinely deliver much larger/choppier
+        per-frame timing than the desktop preview (background throttling,
+        slower devices, general jitter), which reads as visibly unstable
+        motion even where the existing hard clamps kept it from fully
+        exploding. Rebuilt as `_updateLiquid` (a thin wrapper) calling a new
+        `_stepLiquid` in fixed ~1/60s substeps, so every individual update
+        always runs at the same small, known-stable dt this was tuned at
+        regardless of real frame timing. Verified by hammering it with 300
+        frames of a simulated ~10fps (0.1s dt) with rapidly randomized angle —
+        previously guaranteed instability territory — and confirming levels
+        stayed bounded (~2, well inside the tube's ±22 walls) with no NaN.
+  65. **Every particle emitter's spawn rate was silently capped by frame
+      rate**, and "the jets aren't showing up well on the phone" (Rob) turned
+      out to be the visible symptom. All of them (jets, `HingeMagic`,
+      `HingeSparks`, the Game Over bubbles) used `if (timer <= 0) spawn one`
+      — harmless at a smooth 60fps (timer rarely goes past one interval
+      negative), but on a choppier real-device frame rate this caps the
+      *actual* spawn rate at however many frames render per second instead of
+      the intended flow rate (e.g. a jet meant to fire 100 particles/sec
+      could only ever spawn 1 per rendered frame, so at a real 20fps it'd be
+      firing at 20/sec — a fifth of the intended density — with no error or
+      obvious symptom, just "looks weak"). Switched all four to a
+      `while (timer <= 0)` loop (capped at a max catch-up count per frame so
+      one huge stall can't spawn hundreds at once) so density stays correct
+      regardless of frame rate. Verified directly: simulating a choppy
+      ~10fps for 1 real second on a jet now produces ~40 live particles
+      (matching the real flow×lifetime steady-state), versus a hard cap of
+      10 (one per simulated frame) before the fix.
+  66. **The ball could tunnel straight through the platform on a big/choppy
+      frame** — same root cause as fix #64's liquid instability, applied to
+      `Physics.update`. The collision check only looks at the ball's
+      position once per call; at a large single-frame `dt` (mobile's typical
+      timing, or any stall), the ball can travel further in that one step
+      than the platform bar is thick, so `_resolvePlatformCollision` can
+      miss the overlap entirely and let it fall straight through instead of
+      landing. Rebuilt the same way as the liquid: `update()` is now a thin
+      substep wrapper (fixed ~1/60s steps, capped at 6 — covers `MAX_DT`
+      with headroom) around the real per-frame logic, now `_step()`.
+      Verified with a worst-case-dt stress test (60 frames at the game's own
+      `MAX_DT`, 0.05s each) starting the ball centered above the platform —
+      lands and rests exactly on the surface (`y` matches the expected
+      resting position to the pixel) instead of risking a fall-through.
+  67. **Follow-up, also Rob: "if it's still close to the corner it sometimes
+      gets sucked back onto the platform rather than falling all the way
+      down."** A real bug, and a subtle one: the platform keeps retargeting
+      to a new random angle every few seconds, and the collision check
+      re-projects the ball's position onto whatever the bar's *current*
+      angle is every single frame — there's no memory of "this ball already
+      left through one end." `perp > restPerp` (how far the ball is
+      overlapping the resting surface) had no *upper* bound, so if a ball
+      fell off near one end without dropping far yet, and the bar's next
+      random retarget happened to swing its tip back toward the ball's
+      world position, the remapped (along, perp) pair could land back in
+      "resting on top" territory even though the ball is actually well
+      below/behind the bar now, not on it — reading as getting yanked back
+      onto the platform. Fixed by bounding how deep an overlap still counts
+      as "resting" to one ball-radius (`perp < restPerp + displayRadius`),
+      which rejects the "wrong side of the bar" case while still catching
+      genuine landings. Verified by placing the ball just past the bar's
+      end, letting it fall only 24px (still genuinely close to the corner),
+      then forcing the platform to swing hard toward it — ball kept falling
+      and accelerating instead of snapping back.
+  68. **Every hinge/jet particle timer above (fix #65) also got the loop
+      fix applied to `HingeBubbles` in `fog.js`** for consistency, plus a
+      couple of gameplay-feel/energy adjustments Rob asked for in the same
+      pass:
+      - Moon-phase tilt multipliers toned down — `MOON_STAGE_PARAMS`
+        1/1.5/2.5/4 → 1/1.25/2/3 — after Rob flagged Fire-moon phases as
+        "too much energy" (a red moon was multiplying tilt strength 4x;
+        explained the tube-heat stage's own `grip`/`tiltForce` numbers
+        alongside this since they stack with the moon's multiplier, but
+        left those untouched for now).
+      - Game Over screen's bottom button pill scaled up another 10% (was
+        already 60% bigger than the original per fix #19; now 1.6×1.1).
+  69. **Hinge-touch bubbles rebuilt around the real source emitter, after a
+      first pass just tuning the existing hand-built one.** Rob first asked
+      for the existing bubbles 20% bigger and 20% fewer (done: burst
+      interval stretched 25%, size ×1.2) but also offered the option of
+      matching the real source data instead — found it (`SparklesFront`,
+      literally the same object CLAUDE.md's Stage 4 notes already say this
+      was modeled after) and it turned out meaningfully different from the
+      hand-tuned version: much bigger (30px, shrinking to 0, vs 3-9px
+      fixed), gentler initial force (5-20 vs "speed" 90-160), long variable
+      lifetimes (0.2-8s vs a fixed 3s), and a pink→cyan color shift over
+      each bubble's life using the real `Bubble.png` texture (copied in,
+      tinted per-particle via the existing `drawTintedParticle` helper)
+      instead of flat-color hand-drawn circles. Built it as a full swap
+      (easy to revert, nothing pushed yet) and Rob preferred it — kept two
+      things from the old hand-tuned version on top of the real data
+      though: a per-bubble sideways wobble (Rob: "the 3 dimensional twist
+      as they flowed up" — layered on as a draw-time x-offset rather than
+      baked into the position integration) and a 15%-longer lifetime range,
+      since he liked those specific qualities better than the raw source
+      numbers.
+  70. **Z-order follow-up on the same bubbles, twice.** First: "put the
+      emitter behind the dot" — bubbles had been drawn between the dot and
+      the ring (fix #46's ordering, from when they were a different, more
+      subtle effect); moved the `HingeBubbles.draw()` call to right before
+      the dot's own stroke passes. Turned out insufficient — "I still see
+      the red from the emitter in front of my dot" — because the hinge
+      *sprite itself* (drawn earlier) is what's actually opaque at the
+      dot's location; the dot's neon treatment on top of it is only a
+      stroked outline, which doesn't cover its own interior. Moved the
+      bubbles call to before the sprite draw too, so the sprite's own
+      opaque pixels are what finally occludes them at the dot — the only
+      point in the draw order where something opaque actually sits on top
+      of that spot.
+
 **Dev tooling note:** hit a caching issue while verifying the fixes above — the
 Browser-pane preview tool caches by *exact URL*, harder than a normal browser (even
 `location.reload(true)` didn't bust it; only navigating to a URL with a new query

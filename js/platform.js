@@ -244,6 +244,15 @@ const Platform = {
     ];
     const rgb = c.join(',');
 
+    // Hinge bubbles drawn first, before the sprite itself — the sprite's own
+    // art is opaque right where the dot sits, so drawing bubbles any later
+    // than this still let them show through on top of the dot (Rob: "I still
+    // see the red from the emitter in front of my dot") since a stroked
+    // outline alone doesn't cover its own interior. This is the only point
+    // in the draw order where something actually opaque sits on top of them
+    // at the dot's location.
+    HingeBubbles.draw(ctx, images);
+
     // Sprite drawn plain (untinted) — matches how the pole's own base sprite
     // is left alone and only gets a separate glowing outline on top, rather
     // than recoloring the sprite's own pixels (the source-atop tinting
@@ -254,10 +263,7 @@ const Platform = {
     }
 
     // Same neon treatment on the center dot — a stroked outline on its edge
-    // (matching the ring's technique exactly), not a filled disk. Drawn before
-    // the ring and before the hinge bubbles now (Rob: bubbles should sit in
-    // front of the dot but behind the ring), whereas this used to be drawn
-    // after the ring.
+    // (matching the ring's technique exactly), not a filled disk.
     const dotR = 17;
     // Most of the glow removed here (Rob: not needed now that the stroke
     // itself is blurred via ctx.filter) — dropped the big radial-gradient halo
@@ -303,11 +309,6 @@ const Platform = {
       ];
       drawTintedParticle(ctx, images.smokeParticle, p.x, p.y, size, col, alpha, true);
     }
-
-    // Hinge bubbles now drawn from inside here (used to be a separate call
-    // after Platform.drawHinge() in ui.js) specifically so they land between
-    // the dot (above) and the ring (below) in z-order.
-    HingeBubbles.draw(ctx);
 
     // Glowing ring outline — same stroke + blurred-line technique as the dot.
     // Two strokes, one on the ring's inner edge (~47) and one on its outer

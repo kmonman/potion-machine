@@ -59,6 +59,14 @@ const Fog = {
 // ambient background effect. (First pass had these spawning randomly across the
 // whole screen at all times; Rob caught that they should specifically be part of
 // the hinge-touch feedback, alongside the glow and sparkles.)
+// Trying the *real* source emitter here for comparison (Rob) — the original
+// project's hinge-bubble object is literally called "SparklesFront", with:
+// flow 50/s, force 5-20 (gentle), life 0.2-8s (long-lived), size 30→0
+// (starts big, shrinks away), color pink(254,19,117)→cyan(63,203,255) with
+// alpha 255→0, particleGravityY -40 (continuously accelerates upward),
+// texture Bubble.png. This is a full swap of the previous hand-tuned version
+// (dense small circles, fixed 3s life, one pink tone) — easy to revert to
+// that if this doesn't look right, nothing here is pushed yet.
 const HingeBubbles = {
   bubbles: [],
   spawnTimer: 0,
@@ -71,59 +79,60 @@ const HingeBubbles = {
   update(dt, emitting, x, y) {
     if (emitting) {
       this.spawnTimer -= dt;
-      // `while`, not `if` — same fix as the jets/hinge particles: on a
-      // slower/less consistent frame rate (mobile) this otherwise caps the
-      // real spawn rate at the frame rate instead of the intended one.
       let bubbleGuard = 0;
       while (this.spawnTimer <= 0 && bubbleGuard < 20) {
-        // Dense cluster while touching — matches the intro art's thick bubble
-        // burst around the hinge, not a thin trickle (Rob: "a lot should flow up").
-        this.spawnTimer += 0.035;
+        this.spawnTimer += 1 / 50; // flow=50/s
         bubbleGuard++;
-        for (let i = 0; i < 3; i++) {
-          this.bubbles.push({
-            x: x + (Math.random() - 0.5) * 34,
-            y: y + (Math.random() - 0.5) * 14,
-            r: 3 + Math.random() * 6,
-            speed: 90 + Math.random() * 70,
-            wobblePhase: Math.random() * Math.PI * 2,
-            wobbleAmp: 8 + Math.random() * 14,
-            // Persistent per-bubble sideways drift (separate from the wobble,
-            // which just oscillates around a fixed center) so the column leans
-            // and spreads a bit as it rises instead of staying a perfectly
-            // straight line (Rob's ask).
-            driftVx: (Math.random() - 0.5) * 22,
-            life: 3,
-            maxLife: 3,
-          });
-        }
+        // angleA=0/angleB=180 in the source — spread across the whole upper
+        // half (never aims downward), matching gravityY pulling everything
+        // up regardless of its initial direction.
+        const angle = -Math.PI / 2 + (Math.random() - 0.5) * Math.PI;
+        const force = 5 + Math.random() * 15; // emitterForceMin/Max 5-20
+        this.bubbles.push({
+          x, y,
+          vx: Math.cos(angle) * force,
+          vy: Math.sin(angle) * force,
+          life: 0,
+          // Slightly longer-lived than the real source values (Rob liked
+          // that about the previous hand-tuned version) — same 0.2-8s
+          // range, just stretched 15%.
+          maxLife: (0.2 + Math.random() * 7.8) * 1.15,
+          maxSize: 30, // particleSize1 (shrinks to particleSize2=0)
+          // Borrowed from the previous hand-tuned version too (Rob: "the 3
+          // dimensional twist as they flowed up") — a per-bubble sideways
+          // weave layered on top of the emitter's own vx/vy, drawn as an x
+          // offset rather than baked into position so it doesn't fight the
+          // real gravity/velocity integration below.
+          wobblePhase: Math.random() * Math.PI * 2,
+          wobbleAmp: 6 + Math.random() * 10,
+          wobbleSpeed: 1 + Math.random() * 1,
+        });
       }
     }
     for (const b of this.bubbles) {
-      b.y -= b.speed * dt;
-      b.x += b.driftVx * dt;
-      b.wobblePhase += dt * 1.5;
-      b.life -= dt;
+      b.vy += -40 * dt; // particleGravityY — continuously accelerates upward
+      b.x += b.vx * dt;
+      b.y += b.vy * dt;
+      b.wobblePhase += dt * b.wobbleSpeed;
+      b.life += dt;
     }
-    this.bubbles = this.bubbles.filter((b) => b.life > 0);
+    this.bubbles = this.bubbles.filter((b) => b.life < b.maxLife);
   },
 
-  draw(ctx) {
+  draw(ctx, images) {
     for (const b of this.bubbles) {
-      const x = b.x + Math.sin(b.wobblePhase) * b.wobbleAmp;
       const t = b.life / b.maxLife;
-      const alpha = 0.5 * Math.min(1, (1 - t) * 5) * Math.min(1, t * 2.5);
-      ctx.beginPath();
-      ctx.arc(x, b.y, b.r, 0, Math.PI * 2);
-      // Filled pink core + brighter rim — reads as a much thicker bubble cluster
-      // than the old thin purple outline, matching the intro art's look. A
-      // middle ground between the original pale/lavender tone and a later pass
-      // that pushed chroma too far the other way (Rob: "too pink now").
-      ctx.fillStyle = `rgba(243, 55, 190, ${Math.max(0, alpha * 0.38)})`;
-      ctx.fill();
-      ctx.strokeStyle = `rgba(255, 108, 218, ${Math.max(0, alpha)})`;
-      ctx.lineWidth = 1.5;
-      ctx.stroke();
+      const size = b.maxSize * (1 - t); // particleSize1→particleSize2 (30→0)
+      const alpha = 1 - t; // particleAlpha1→particleAlpha2 (255→0)
+      const drawX = b.x + Math.sin(b.wobblePhase) * b.wobbleAmp;
+      const col = [
+        Math.round(254 + (63 - 254) * t),
+        Math.round(19 + (203 - 19) * t),
+        Math.round(117 + (255 - 117) * t),
+      ];
+      if (images.hingeBubbleParticle) {
+        drawTintedParticle(ctx, images.hingeBubbleParticle, drawX, b.y, size, col, alpha, false);
+      }
     }
   },
 };

@@ -39,9 +39,32 @@ const Physics = {
     this.fellOff = false;
   },
 
+  // Runs physics in fixed ~1/60s substeps instead of one shot at whatever
+  // `dt` the frame happened to be — same fix as the liquid sim
+  // (Platform._updateLiquid) and applied here for the same reason: at a big
+  // single-frame dt (mobile's choppier/larger per-frame timing, or any
+  // desktop stall), the ball can travel further in one step than the
+  // platform bar is thick, so the discrete collision check in
+  // _resolvePlatformCollision can miss it entirely and let it fall straight
+  // through — a real "tunneling" bug, not just a feel issue. Substepping
+  // keeps each individual position/collision update at the same small dt
+  // this was tuned at, so it can't outrun its own collision check regardless
+  // of how large or uneven the real frame time is.
   update(dt, tiltX) {
     if (this.fellOff) return;
+    const maxStepDt = 1 / 60;
+    const maxSubsteps = 6; // covers MAX_DT (1/20s) with headroom
+    let remaining = Math.min(dt, 0.1);
+    let substeps = 0;
+    while (remaining > 0 && substeps < maxSubsteps && !this.fellOff) {
+      const stepDt = Math.min(remaining, maxStepDt);
+      this._step(stepDt, tiltX);
+      remaining -= stepDt;
+      substeps++;
+    }
+  },
 
+  _step(dt, tiltX) {
     // --- integrate free motion ---
     // Tilt strength is scaled by the current difficulty stage — heat and moon
     // phases both make the controls twitchier, matching the original's combined
@@ -84,7 +107,21 @@ const Physics = {
     const restPerp = -(p.thickness / 2 + this.displayRadius);
     const halfLength = p.length / 2;
 
-    if (Math.abs(along) <= halfLength && perp > restPerp) {
+    // `perp > restPerp` alone has no upper bound, so it also matches a ball
+    // that has already fallen well past the bar and ended up on the wrong
+    // side of it — normally impossible without tunneling (which the
+    // substepping in update() now prevents), but the platform keeps
+    // rotating to a new angle every few seconds, and `along`/`perp` are
+    // recomputed against whatever the *current* rotated bar is every frame.
+    // A ball that fell off near one end can have the bar's tip swing back
+    // toward its world position, remapping it back into "along the bar,
+    // deeply overlapping" even though it's actually well below/behind the
+    // bar now — which read as the ball getting "sucked back onto the
+    // platform" instead of falling all the way down (Rob). Capping how deep
+    // an overlap still counts as "resting" (one ball-radius) rejects that
+    // case while still catching genuine landings.
+    const maxRestOverlap = restPerp + this.displayRadius;
+    if (Math.abs(along) <= halfLength && perp > restPerp && perp < maxRestOverlap) {
       // Push the ball back to rest on the surface.
       const clampedAlong = along;
       const clampedPerp = restPerp;

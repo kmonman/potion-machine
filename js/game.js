@@ -21,6 +21,7 @@ const ASSET_PATHS = {
   glowParticle: 'assets/Glow.png',
   smokeParticle: 'assets/DarkMagicSmoke.png',
   jetParticle: 'assets/LightGlow.png',
+  hingeBubbleParticle: 'assets/Bubble.png',
   pole: 'assets/NewSprite.png',
   platform: 'assets/Tube4.png',
   hinge: 'assets/Hinge.png',

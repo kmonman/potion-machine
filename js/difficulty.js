@@ -45,11 +45,13 @@ const TUBE_STAGE_PARAMS = {
   Fire: { grip: 0.40, tiltForce: 0.6, color: [255, 0, 85] },
 };
 
+// Tilt multipliers toned down (Rob: "too much energy" at Fire) — was
+// 1/1.5/2.5/4.
 const MOON_STAGE_PARAMS = {
   Cool: { multiplier: 1, image: null },
-  Warm: { multiplier: 1.5, image: 'moonWarm' },
-  Hot: { multiplier: 2.5, image: 'moonHot' },
-  Fire: { multiplier: 4, image: 'moonFire' },
+  Warm: { multiplier: 1.25, image: 'moonWarm' },
+  Hot: { multiplier: 2, image: 'moonHot' },
+  Fire: { multiplier: 3, image: 'moonFire' },
 };
 
 // Jet mount points as a distance along the platform bar from the hinge (matches the
