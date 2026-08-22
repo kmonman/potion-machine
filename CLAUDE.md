@@ -1163,6 +1163,65 @@ deploy with a proper HTTPS cert (even a free static host), not local network exp
       point in the draw order where something opaque actually sits on top
       of that spot.
 
+  71. **"The game is lagging a lot" (Rob, on his phone) — a real, measured
+      performance bug, not a device limitation.** Counted particles during a
+      realistic busy moment (touching the hinge with jets active, which
+      happens naturally in Free Play's script) and found **433 particles
+      alive at once**. Every one draws through `drawTintedParticle`, which
+      re-tints its texture from scratch every call (paint onto a scratch
+      canvas, composite a color over it, copy that to the main canvas) —
+      not a cheap operation. Timed just that particle-drawing work directly:
+      **~22ms per frame** on desktop alone, when a smooth 60fps needs the
+      *entire* frame (particles plus everything else) under ~16.6ms — mobile
+      canvas rendering is typically several times slower than desktop for
+      this kind of per-call compositing work, so this alone was enough to
+      explain heavy, sustained lag. Root cause traced to two things, both
+      from earlier the same night:
+      - Fix #65's spawn-rate correctness fix (`while` instead of `if`) has a
+        nasty side effect on an already-struggling device: a slow frame now
+        spawns *extra* particles to catch up to the intended flow rate,
+        which makes the next frame slower still — a feedback loop that can
+        run away on a weak device, whereas the old (visually wrong) `if`
+        version accidentally self-throttled by capping spawns to the frame
+        rate.
+      - The new real-emitter hinge bubbles (fix #69) steady out around ~230
+        concurrent bubbles on their own, now drawn with the pricier tinted
+        technique instead of the old flat `ctx.arc` circles.
+      Added a hard cap to every particle system (jets, `HingeMagic`,
+      `HingeSparks`, `HingeBubbles`) so none of them can exceed a fixed
+      ceiling regardless of frame timing — this also closes off the
+      feedback-loop risk, since a capped system can't spiral upward.
+      Re-measured after capping: 433→223 particles in the same busy moment,
+      ~22ms→~4ms of draw time, both roughly a 2x/5x drop.
+  72. **Follow-up bug in the cap itself: "the bubbles are barely going up"
+      (Rob).** The first version of the cap trimmed the *oldest* particle on
+      every overflow — fine for jets/sparks/magic, which all have short,
+      fairly uniform lifetimes, but wrong for the hinge bubbles, which now
+      have a wide randomized range (0.2-9.2s, fix #69). Flow (50/s) alone
+      fills the 80-particle cap in 1.6s, so from then on the oldest ones
+      being trimmed were constantly bubbles that still had most of a
+      randomly-assigned long life ahead of them — cut short well before
+      they'd risen or faded, capping every visible bubble's real age at
+      ~1.6s no matter what lifetime it was actually given. Switched all four
+      caps to *skip spawning* once at the ceiling instead of killing an
+      existing particle to make room — new bubbles just pause until an
+      existing one dies of natural causes, so every bubble that does spawn
+      lives out its full assigned lifetime undisturbed. Verified visually:
+      bubbles reach the same height as before the cap was added.
+      **Bigger picture, not yet acted on:** the real reason this per-particle
+      tinting is so expensive is that it's CPU-bound Canvas 2D work standing
+      in for what GDevelop's own particle system gets for free on the GPU.
+      Discussed the real options with Rob: (a) a pre-tinted texture cache
+      (paint a handful of color steps once at load instead of live-tinting
+      every particle every frame — biggest remaining win, no new
+      dependency, moderate effort), (b) hand-rolled WebGL for just the
+      particles (real GPU speed, no external dependency, most effort to
+      build correctly), or (c) pull in PixiJS (the library GDevelop's own
+      runtime is built on — least effort since it's pre-built, but a new
+      external dependency the project doesn't otherwise have). Rob wants to
+      see how the capped version performs on his phone before deciding
+      whether any of these are worth doing.
+
 **Dev tooling note:** hit a caching issue while verifying the fixes above — the
 Browser-pane preview tool caches by *exact URL*, harder than a normal browser (even
 `location.reload(true)` didn't bust it; only navigating to a URL with a new query
